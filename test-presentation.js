@@ -15,7 +15,7 @@ const fs = require('fs');
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 900 });
 
-  const filePath = 'file://' + path.resolve(__dirname, 'presentation.html');
+  const filePath = 'file://' + path.resolve(__dirname, 'index.html');
   await page.goto(filePath, { waitUntil: 'networkidle0', timeout: 15000 });
   await new Promise(r => setTimeout(r, 2000));
 
