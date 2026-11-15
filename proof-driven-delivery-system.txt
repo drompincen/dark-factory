@@ -31,6 +31,10 @@ Six principles follow from that:
 5. Every shipped feature leaves behind the regression that guards it.
 6. Atlas is the only source of truth. What is not in Atlas, agents do not
    know.
+7. Earn trust before adding sessions. One agent that can prove its work
+   comes before twelve that cannot.
+8. A correction made twice becomes a check. Rules live in lint, tests, hooks
+   and skills, not in chat.
 
 
 2. SYSTEM AT A GLANCE
@@ -167,6 +171,10 @@ Pages to add
 - Proof catalog. The regression suite indexed by flow and by rung.
 - Glossary and domain model. One meaning per term.
 - Lessons. Agent failure patterns, each turned into a rule or a check.
+- Remit pages. One per remit: scope, current lead, what good looks like,
+  exemplar contracts and bundles, session cap.
+- Flow map. For each flow: how to reach it in a spotlight, how to drive it,
+  its flags and data, known traps.
 
 Mark every flow as legacy, transitional or target, so agents never extend a
 legacy pattern.
@@ -246,7 +254,8 @@ Every rung produces one standard artifact attached to the merge request:
 - What was not tested, and known risks
 
 Reviewers read the bundle instead of re-deriving the work. Product reviews
-the scenario evidence, not the diff.
+the scenario evidence, not the diff. Build the bundle for fast human
+reading: verdict first, then evidence a person can check at a glance.
 
 Keeping the proof honest
 
@@ -268,6 +277,30 @@ A change that passes on a test track and fails in UAT usually means a faker
 has drifted from the real system. Record real responses in UAT, sanitise
 them, and use them to refresh the faker. Track this count; it tells you how
 much to trust rungs 1 and 2.
+
+Verification skills
+
+A proof is only as good as the agent's ability to operate the real product.
+A verification skill is a scripted tool plus instructions that lets a
+session do that for one flow:
+
+- Start the right spotlight and stage the faker responses.
+- Drive the flow through its API, CLI or UI.
+- Capture what happened: responses, logs, traces, screenshots.
+- Return pass or fail with the evidence attached.
+
+Each remit owns the verification skills for its flows, and they are the
+first thing a remit builds. They grow by one rule: the second time anyone
+checks something by hand, the check becomes part of the skill. Unit tests
+and a clean build are not verification; the running flow is.
+
+The flow map
+
+Agents lose time rediscovering how to reach and control a feature. The flow
+map in Atlas records it once per flow: entry points, the commands that
+drive it, flags, required data and known traps. The product stays the
+source of truth and the map is a cheap index into it. A scheduled session
+re-checks the map against the baseline track and fixes what has drifted.
 
 
 6. AGENT RUNTIME
@@ -301,6 +334,13 @@ Durable state
 - Commits are small and frequent, so a failed run loses little.
 - A change that spans repos uses one branch name everywhere plus a
   change-set manifest the track can deploy as a unit.
+
+Keep or revert
+
+Every attempt ends at a commit where the proofs are no worse than before.
+An attempt that makes them worse is reset to the last green commit, not
+patched forward. This keeps a long run from burying itself under its own
+failed fixes.
 
 Getting unstuck
 
@@ -368,6 +408,29 @@ Cap the number of items each engineer may have waiting for a track. At the
 cap, their builders switch to spotlights, fakers, verification or regression
 speed, which is the work that raises the ceiling.
 
+Earn parallelism
+
+Twelve sessions that cannot prove their work only lengthen the review queue.
+A remit raises its session cap in steps, and the remit lead decides each
+step from first-pass rate and escapes:
+
+1. One attended session per engineer, until the remit's verification skill
+   drives its main flows and items land clean.
+2. Three to four sessions, with a verifier on every item.
+3. Six to twelve sessions, including unattended overnight runs for tiers 0
+   and 1.
+
+Improvement loops
+
+Some work is a number, not a feature: regression suite duration, flake rate,
+track reset time, spotlight start time, a latency target. Run it as a loop
+with a fixed time budget per experiment: change, measure, commit if the
+number improved, reset if it did not. The metric is the proof, so these
+loops suit unattended overnight sessions and are the best use of builders
+that are waiting for a track. Use them only where better is a single number
+that is hard to game, and keep the full proof suite as a guard so the number
+cannot improve by breaking something else.
+
 
 7. ENVIRONMENT CAPACITY
 -----------------------
@@ -428,15 +491,17 @@ smaller tracks or richer spotlights are the three ways to raise throughput.
 8. ROLES
 --------
 
-Pod lead, dev and product lead describe who writes code and who assigns it.
-In this model people direct, verify and decide, so the roles change.
+Leads keep their remits. What changes is the work: people direct, verify
+and decide, and leads make "what good looks like" explicit enough to grade
+an agent against.
 
   Outcome owner (Product)
     Intent, proof scenarios, UAT acceptance, the weekly mark to market
-  Stream owner (Engineer)
+  Item owner (Engineer)
     6 to 12 Claude sessions; every item they claim, from Ready to Regressed
-  Stream lead (Former pod lead)
-    One flow or outcome end to end, and its regression health
+  Remit lead (Senior engineer, rotating)
+    What good looks like for the remit: criteria, exemplars, verification
+    skills, regression health
   Harness team (Engineers)
     Tracks, spotlights, fakers, the git queue, proof tooling
   Proof steward (Engineers)
@@ -446,14 +511,14 @@ In this model people direct, verify and decide, so the roles change.
   Release and reliability (Engineers)
     Rollout, flags, monitoring, rollback
 
-A starting split of the 50 engineers, to adjust after the pilot: 30 stream
-owners and leads, 8 on the harness, 4 proof stewards, 4 Atlas stewards, 4 on
-release.
+A starting split of the 50 engineers, to adjust after the pilot: 30 engineers
+across the remits, including their leads, 8 on the harness, 4 proof
+stewards, 4 Atlas stewards, 4 on release.
 
 Three rules hold the model together:
 
-- Streams follow flows, not repos. A stream owns an outcome across whichever
-  repos it touches.
+- Remits follow outcomes, not repos. A remit owns its flows across
+  whichever repos they touch.
 - A named human owns every item. Agents execute; they are never accountable.
 - The harness team is the highest-leverage group. Every hour they remove
   from a track reset or a spotlight start is returned on every item.
@@ -461,6 +526,27 @@ Three rules hold the model together:
 The skill that matters most shifts from writing code to writing falsifiable
 acceptance and reading a proof bundle critically. Plan training for both,
 for engineers and product.
+
+Remit leads
+
+A remit lead is a senior engineer accountable for one remit, and the role
+rotates. The lead's job is to turn judgment into something written that
+agents and other engineers can be held to:
+
+- Owns the remit page in Atlas: criteria, exemplar contracts, exemplar
+  proof bundles, known traps.
+- Owns the remit's verification skills, flow map entries and remit-specific
+  lint rules.
+- Approves contracts and proofs for tiers 2 and 3, and is the escalation
+  point for questions of quality.
+- Calibrates the verifier with examples of work that passed and work that
+  should not have.
+- Sets the remit's session cap and its auto-merge scope.
+
+Rotation works because the standard lives in Atlas, not in the lead's head.
+A handover is the remit page, the open escalations and the items in flight.
+Rotation also spreads understanding of each remit across the senior people,
+and understanding is the part that cannot be handed to agents.
 
 
 9. CADENCE
@@ -550,6 +636,27 @@ A defect that reaches UAT or prod triggers three things: a regression test
 at the lowest rung that could catch it, an entry in Atlas lessons, and a
 check on whether the tier rule was too loose.
 
+Rules live in the codebase
+
+Correcting an agent in chat fixes one session. Encoding the correction
+fixes all 600. When the same correction is made twice, it becomes one of
+these, in order of preference:
+
+1. A lint rule or pipeline check, which cannot be skipped.
+2. A hook in the agent harness, for actions that must or must not happen
+   every time.
+3. A skill or playbook, for knowledge needed only on some tasks.
+4. A line in the repo's agent instructions, kept short, for what applies to
+   every task.
+
+Earned auto-merge
+
+Human review is the next bottleneck after tracks. The way through is to
+move work down the tiers, not to review faster. A remit lead may widen what
+merges without human review when the change type can be checked fully by
+program and the remit's escape rate supports it. Changes that cannot be
+verified by program stay with human review, whatever the volume.
+
 
 11. METRICS
 -----------
@@ -595,35 +702,35 @@ That habit, more than any metric, is what moves the ceiling.
 12. ROLLOUT
 -----------
 
-Convert one stream first, then scale what works. Automating an unproven loop
+Convert one remit first, then scale what works. Automating an unproven loop
 across 50 engineers multiplies its flaws. Each phase ends at a gate counted
 in proven items.
 
 Phase 1. Pilot contract (weeks 1 to 2)
-  - One stream: one flow, about six engineers, two product
+  - One remit: its lead, about six engineers, two product
   - Contract template, Atlas authority rules, proof bundle v0
   - Queue repo with claim branches, track leases by hand
   GATE: 3 items Track-proven, each with a bundle
 
-Phase 2. Closed loop, one stream (weeks 3 to 6)
-  - Spotlights as code and the standard harness commands
+Phase 2. Closed loop, one remit (weeks 3 to 6)
+  - Verification skill for the remit's flows, spotlights as code
   - Verifier agent, tier rules, protected proofs
   - Full ladder to prod, with regression promotion
   GATE: 10 items Regressed, lead time measured
 
-Phase 3. Scale to four streams (weeks 7 to 12)
-  - Git queue for every stream, lease branches with reset, merge train
+Phase 3. Scale to four remits (weeks 7 to 12)
+  - Git queue for every remit, lease branches with reset, merge train
   - Mark-to-market dashboard and Atlas write-back
   - Tier 0 auto-merge turned on
   GATE: track wait and first-pass targets met
 
 Phase 4. Whole organisation (months 4 to 6)
-  - Every stream converted, roles reassigned
+  - Every remit converted, session caps raised on evidence
   - Sprints retired, all work enters as contracts
   - Unattended multi-day runs, weekly drift checks
 
 The timings are a proposal; the gates are what matter, and a phase does not
-end until its gate is met. The other streams keep their current process
+end until its gate is met. The other remits keep their current process
 until phase 3 reaches them. After month six the work becomes the monthly
 constraint review: find the longest wait and remove it.
 
@@ -649,5 +756,23 @@ gets built.
     sanitised.
 [ ] The budget per item in agent hours and track hours, and the budget for
     more tracks.
-[ ] Which flow and which people form the pilot stream.
-[ ] What the current pod leads move into, and how that is communicated.
+[ ] Which remit and which people form the pilot.
+[ ] How often remit leads rotate, and the handover checklist.
+
+
+14. SOURCES
+-----------
+
+- Best practices for Claude Code, Anthropic
+  https://code.claude.com/docs/en/best-practices
+- Effective harnesses for long-running agents, Anthropic
+  https://anthropic.com/engineering/effective-harnesses-for-long-running-agents
+- Harness design for long-running application development, Anthropic
+  https://anthropic.com/engineering/harness-design-long-running-apps
+- pstack explained: Lauren Tan's system for trustworthy AI agents, The Neuron
+  https://www.theneuron.ai/explainer-articles/pstack-explained-lauren-tans-system-for-trustworthy-ai-agents/
+- autoresearch, Andrej Karpathy
+  https://github.com/karpathy/autoresearch
+- From Vibe Coding to Agentic Engineering, Andrej Karpathy at Sequoia AI
+  Ascent 2026
+  https://www.youtube.com/watch?v=96jN2OCOfLs
