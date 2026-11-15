@@ -1,0 +1,653 @@
+PROOF-DRIVEN DELIVERY SYSTEM
+============================
+As of 2026-11-14
+
+
+1. THESIS
+---------
+
+Delivery is no longer limited by how much code the team can write. It is
+limited by how fast the team can prove a change is right. The system below
+is built around that constraint.
+
+"Unlimited delivery" is the right ambition, but throughput will always equal
+the narrowest of four things:
+
+- Intent clarity. An agent can only close a loop against a definition of
+  good that a machine can check.
+- Proof capacity. Ten test tracks serve 300 to 600 agent sessions: 50
+  engineers with 6 to 12 each. That ratio is the hard cap today.
+- Human judgment. 62 people decide what matters, approve what ships, and
+  answer what agents cannot.
+- Integration risk. Twenty repos changing in parallel collide unless changes
+  are small, flagged and proven together.
+
+Six principles follow from that:
+
+1. Every work item carries its own proof. No proof definition, no start.
+2. Items advance on evidence, not on status updates or assertion.
+3. Humans own intent and judgment. Agents own the execution loop.
+4. Prove in the cheapest environment that can falsify the change.
+5. Every shipped feature leaves behind the regression that guards it.
+6. Atlas is the only source of truth. What is not in Atlas, agents do not
+   know.
+
+
+2. SYSTEM AT A GLANCE
+---------------------
+
+Every item climbs five rungs and ends as a permanent regression test.
+
+  +----------------+          +----------------------------------+
+  | ATLAS          |--binds-->| Work contract                    |
+  |                |          | intent, proofs, tier, budget     |
+  | North Star     |          +----------------------------------+
+  | Principles     |                          |
+  | Decisions      |                          v
+  | Agreed flows   |          +----------------------------------+
+  | Target state   |          | 1. Local spotlight               |<-----+
+  | Lessons        |          | agent loop against fakers        |      |
+  |                |          +----------------------------------+      |
+  |                |                          |                         |
+  |                |                          v                         |
+  |                |          +----------------------------------+      |
+  |                |          | 2. Test track                    |<-----+
+  |                |          | full cluster, all repos          |      |
+  |                |          +----------------------------------+      |
+  |                |                          |                    guards
+  |                |                          v                    every
+  |                |          +----------------------------------+ later
+  |                |          | 3. Integrated UAT                |<-----+
+  |                |          | real systems, product accepts    | change
+  |                |          +----------------------------------+      |
+  |                |                          |                         |
+  |                |                          v                         |
+  |                |          +----------------------------------+      |
+  |                |          | 4. Prod                          |      |
+  |                |          | flagged rollout, signal watched  |      |
+  |                |          +----------------------------------+      |
+  |                |                          |                         |
+  |                |                          v                         |
+  |                |          +----------------------------------+      |
+  |                |<-updates-| 5. Regression                    |------+
+  |                |          | proofs become permanent tests    |
+  +----------------+          +----------------------------------+
+
+Atlas binds every contract, and every finished item updates Atlas. A failed
+proof at any rung sends the item back to the agent loop. The proofs of each
+shipped item join the regression that guards the next change at rungs 1 to 3.
+
+
+3. THE WORK CONTRACT
+--------------------
+
+The backlog item is the contract an agent executes against, so it must be
+complete enough to run for hours without a human. Store it as a structured
+file in a git queue repo, named by its Jira key, so any session can parse it.
+
+Fields:
+
+  Outcome link     The Atlas objective or North Star line this item moves
+  Intent           The user-visible or business result, in two or three
+                   sentences
+  Scope            Repos and services in play, and what is explicitly out
+                   of bounds
+  Proof scenarios  Given / when / then cases, with the faker responses each
+                   one needs staged
+  Proof per rung   The executable check that must pass at local, test
+                   track, UAT and prod
+  Prod signal      The metric or log signal that confirms it works live,
+                   with a watch window
+  Constraints      Links to the Atlas principles, decisions and flows that
+                   bind this work
+  Autonomy tier    0 to 3, set by rule (see Guardrails)
+  Budget           Maximum agent hours, iterations and track hours before
+                   it must stop
+  Stop conditions  What forces the agent to park and ask
+  Regression plan  Which scenarios become permanent tests, and at which rung
+  Owners           One named engineer and one named product person
+
+Ready means falsifiable
+
+An item is Ready when all of these hold:
+
+- At least one executable proof exists, or can be written, for every rung.
+- Fakers exist for every external dependency the scenarios touch.
+- No open product or architecture decision blocks it.
+- It fits one agent run through track proof in one to two days. Larger work
+  is an epic that gets decomposed.
+
+If an item cannot be stated as a proof, it is a discovery item. Its output
+is an Atlas decision or a set of contracts, not code.
+
+States
+
+Draft, Ready, Claimed, Local-proven, Track-proven, UAT-proven, Live,
+Confirmed, Regressed. An item only closes at Regressed. Each transition
+requires its evidence attached, and a pipeline check on the queue repo
+should refuse the move without it.
+
+Who writes contracts
+
+Sessions draft contracts from the Jira issue plus Atlas. Product and the
+owning engineer correct and approve them. This keeps 12 product people from
+becoming the first bottleneck.
+
+
+4. ATLAS
+--------
+
+Atlas already holds the right material. What it needs to drive agents is
+authority, structure and a write-back loop.
+
+Authority
+
+Agents must know which pages bind them and which are only context. Give
+every page front matter with status (draft, agreed, superseded), owner, date
+and what it supersedes. Then set a precedence order:
+
+1. North Star
+2. Principles
+3. Decisions, newest wins, superseded ones marked
+4. Agreed flows
+5. Target state
+
+Ideas, minutes and legacy flows are context and never binding. A decision
+made in a meeting counts only once it is promoted from the minutes to a
+decision record.
+
+Pages to add
+
+- Service catalog. For each of the 20 repos: what it owns, its interfaces,
+  how to run it, which spotlights include it.
+- Faker catalog. What each faker stands in for, its staged scenarios, and
+  when it was last checked against the real system.
+- Spotlight catalog. Named partial clusters, mapped to the flows they can
+  prove.
+- Proof catalog. The regression suite indexed by flow and by rung.
+- Glossary and domain model. One meaning per term.
+- Lessons. Agent failure patterns, each turned into a rule or a check.
+
+Mark every flow as legacy, transitional or target, so agents never extend a
+legacy pattern.
+
+How agents use it
+
+- Atlas is mounted in every workspace. Per-repo agent instruction files stay
+  thin and point to it.
+- A contract links the specific pages that bind it. The agent loads those
+  first.
+- Every finished item proposes its Atlas changes as a merge request: flow
+  updated, decision recorded, lesson added. Humans approve them like code.
+
+Keeping it true
+
+A scheduled agent compares agreed flows against behaviour on the baseline
+test track each week and flags drift. Stale pages are worse than missing
+ones, because agents will follow them.
+
+
+5. THE PROOF LADDER
+-------------------
+
+A change climbs five rungs, and each rung answers a question the one below
+cannot. An item moves up only when its evidence for the current rung is
+attached.
+
+Rung 1. Local
+  Environment: Coder workspace, one spotlight with fakers
+  Question:    Does the change do what the contract says, in isolation?
+  Evidence:    Unit, contract and scenario test results; static checks
+  Gate:        Automatic, plus a verifier agent
+
+Rung 2. Test track
+  Environment: Full cluster, all 20 repos, fakers
+  Question:    Does it hold across services, and does anything else break?
+  Evidence:    End-to-end scenarios, regression for touched flows, upgrade
+               from current prod state
+  Gate:        Automatic, plus human review by tier
+
+Rung 3. Integrated UAT
+  Environment: Real integrations
+  Question:    Does it hold against systems we do not own, and does product
+               accept it?
+  Evidence:    Scenario run on real dependencies, faker drift report, full
+               regression
+  Gate:        Product sign-off for tiers 2 and 3
+
+Rung 4. Prod
+  Environment: Live, behind a flag or canary
+  Question:    Does it work for real users without harm?
+  Evidence:    Prod signal inside its watch window, guardrail metrics flat
+  Gate:        Owner confirms; rollback is automatic
+
+Rung 5. Regression
+  Environment: All of the above, permanently
+  Question:    Will we know if it ever breaks?
+  Evidence:    Scenarios merged into the suite, Atlas flow updated
+  Gate:        Automatic
+
+Proof before code
+
+The agent's first output is the failing proofs, written from the contract.
+For tiers 2 and 3, the owner approves those proofs before any implementation
+starts. This is the cheapest review point in the whole system, and it is
+where spec-driven becomes proof-driven.
+
+The proof bundle
+
+Every rung produces one standard artifact attached to the merge request:
+
+- Contract ID and the commit of every repo involved
+- Environment and version manifest
+- Checks run, with results and logs
+- Scenario evidence: API transcripts, and screenshots or recordings for UI
+  and CLI flows
+- What was not tested, and known risks
+
+Reviewers read the bundle instead of re-deriving the work. Product reviews
+the scenario evidence, not the diff.
+
+Keeping the proof honest
+
+An agent that writes both the code and the tests can pass its own exam. Four
+controls prevent that:
+
+- Approved proofs are protected. Changing one after approval raises a flag
+  for the owner.
+- A separate verifier agent with fresh context tries to break the change
+  before the bundle is built.
+- Product holds back a few scenarios the building agent never sees, and runs
+  them at UAT.
+- Any failure found at a higher rung becomes a new test at the lowest rung
+  that could have caught it.
+
+Faker drift
+
+A change that passes on a test track and fails in UAT usually means a faker
+has drifted from the real system. Record real responses in UAT, sanitise
+them, and use them to refresh the faker. Track this count; it tells you how
+much to trust rungs 1 and 2.
+
+
+6. AGENT RUNTIME
+----------------
+
+Runs that last hours or days need a harness around Claude Code: a fixed
+loop, standard commands, durable state and a way to ask for help.
+
+The run loop
+
+1. Claim a Ready item by pushing its claim branch.
+2. Load the contract, its linked Atlas pages and the repo instructions.
+3. Write a plan and the failing proofs.
+4. Implement, run the spotlight, fix, repeat until rung 1 passes.
+5. Hand to the verifier agent. Fix what it finds.
+6. Request a test track, deploy the change set, run rung 2.
+7. Build the proof bundle and open the merge requests.
+8. Respond to review, then hand off to UAT.
+
+Standard commands
+
+Give every agent the same scripted tools: start a spotlight, run a proof,
+request a track, deploy a change set, build a bundle, escalate. Scripts are
+deterministic; prompts are not. Anything the system depends on should be a
+script.
+
+Durable state
+
+- A run journal lives in the branch: plan, progress, decisions taken, dead
+  ends. A fresh session can resume from it.
+- Commits are small and frequent, so a failed run loses little.
+- A change that spans repos uses one branch name everywhere plus a
+  change-set manifest the track can deploy as a unit.
+
+Getting unstuck
+
+- The same failure three times, a budget exhausted, or a stop condition met
+  means park, not push on.
+- A parked agent commits one specific question to the escalations folder in
+  the queue repo, with what it tried.
+- The session takes another item. The owner answers by commit and the run
+  resumes from its journal.
+
+Agent roles
+
+  Builder    Executes the contract through rungs 1 and 2
+  Verifier   Fresh context; tries to break the change
+  Reviewer   Checks the diff against Atlas principles and decisions
+  Librarian  Proposes Atlas updates from finished work
+  Triage     Turns a failed regression or prod alert into a contract
+
+Dispatch
+
+There is no central dispatcher. Workspaces reach only git, so git is the
+queue, the lock service and the message bus. Each engineer's 6 to 12
+sessions pull work from it.
+
+Git as the control plane
+
+One queue repo, beside Atlas, holds all coordination state.
+
+  Backlog      One contract file per item under ready/, named by Jira key
+  Claim        Push branch claim/<key>. The server rejects a second create,
+               so the first push wins
+  State        A status field in the contract on its claim branch; a
+               pipeline job builds the board from all claim branches
+  Track lease  Push branch lease/track-NN holding owner and expiry; delete
+               it to release
+  Escalation   One question file under escalations/; the answer is a commit
+  Evidence     The pipeline commits each proof bundle back to the item's
+               claim branch
+  Close        The claim branch merges to main when the item reaches
+               Regressed
+
+Four rules keep this sound at 600 sessions:
+
+- Protect claim/* and lease/* from force-push, or the locks mean nothing.
+- One file per item and per question, so no two sessions ever edit the same
+  file.
+- A pipeline job deletes leases past expiry and releases claims that have
+  gone quiet.
+- Jira stays the record of intent, read-only. Git is the record of
+  execution state.
+
+Sessions per engineer
+
+Six hundred builders against ten tracks would only build a queue. Spread
+each engineer's sessions across roles so most of the work happens below
+rung 2.
+
+  3 to 5 sessions  Builders, one claimed item each, working at rung 1
+  1 to 2 sessions  Verifiers, on a peer's items where possible
+  1 session        Reviewer against Atlas
+  1 session        Contract drafting from Jira and Atlas
+  1 session        Librarian and triage
+
+Cap the number of items each engineer may have waiting for a track. At the
+cap, their builders switch to spotlights, fakers, verification or regression
+speed, which is the work that raises the ceiling.
+
+
+7. ENVIRONMENT CAPACITY
+-----------------------
+
+Test track hours are the scarcest resource in the system, so schedule them
+like one. Ten tracks is the ceiling on concurrent full-cluster proofs,
+whatever the number of agents.
+
+Track scheduling
+
+- Tracks are leased, not owned. A lease is a branch in the queue repo with
+  an expiry, and it releases automatically.
+- Every lease starts from a reset to a known baseline: main branch images
+  plus seeded data.
+- Measure request-to-ready time and reset time. These set the real cycle
+  time of rung 2.
+- Agents need track logs and traces to debug in a closed loop. Workspaces
+  are closed, so the pipeline must commit them back to git.
+
+A starting allocation to tune from, not a recommendation to keep:
+
+  6 tracks  Leased item proofs
+  2 tracks  Baseline: continuous full regression on main
+  1 track   Merge train: batched local-proven changes proven together
+  1 track   Demos, exploration and incident reproduction
+
+Batching
+
+One change per track will not scale. Run a merge train: combine several
+rung-1-proven changes on one track, prove them together, and bisect on
+failure. Small flagged changes make this safe.
+
+Spotlights
+
+A workspace holds one cluster or one spotlight inside 28 GB, so spotlights
+carry most of the load.
+
+- Define each spotlight as code: which services, which fakers, which seed
+  data.
+- Map spotlights to flows. A contract names the spotlight that can prove it.
+- The more a spotlight can falsify, the fewer track hours each item needs.
+  Investing here raises the ceiling without buying tracks.
+
+Fakers
+
+- Version fakers and their staged scenarios alongside the code.
+- A contract that needs a new external response adds the faker scenario as
+  part of the work.
+- Each faker has an owner and a last-verified date against the real system.
+
+The scaling lever
+
+When track wait time is the longest wait in the system, compare the cost of
+an eleventh track with the cost of idle agents and engineers. More tracks,
+smaller tracks or richer spotlights are the three ways to raise throughput.
+
+
+8. ROLES
+--------
+
+Pod lead, dev and product lead describe who writes code and who assigns it.
+In this model people direct, verify and decide, so the roles change.
+
+  Outcome owner (Product)
+    Intent, proof scenarios, UAT acceptance, the weekly mark to market
+  Stream owner (Engineer)
+    6 to 12 Claude sessions; every item they claim, from Ready to Regressed
+  Stream lead (Former pod lead)
+    One flow or outcome end to end, and its regression health
+  Harness team (Engineers)
+    Tracks, spotlights, fakers, the git queue, proof tooling
+  Proof steward (Engineers)
+    Suite speed, flake rate, coverage by flow
+  Atlas steward (Architects)
+    Principles, decisions, target state, drift
+  Release and reliability (Engineers)
+    Rollout, flags, monitoring, rollback
+
+A starting split of the 50 engineers, to adjust after the pilot: 30 stream
+owners and leads, 8 on the harness, 4 proof stewards, 4 Atlas stewards, 4 on
+release.
+
+Three rules hold the model together:
+
+- Streams follow flows, not repos. A stream owns an outcome across whichever
+  repos it touches.
+- A named human owns every item. Agents execute; they are never accountable.
+- The harness team is the highest-leverage group. Every hour they remove
+  from a track reset or a spotlight start is returned on every item.
+
+The skill that matters most shifts from writing code to writing falsifiable
+acceptance and reading a proof bundle critically. Plan training for both,
+for engineers and product.
+
+
+9. CADENCE
+----------
+
+Monthly sprints are replaced by continuous flow with a few fixed rhythms.
+Work is pulled whenever capacity frees up; meetings exist to unblock, steer
+and improve the system.
+
+  Continuous
+    Agents pull Ready items. Work-in-progress limits are tied to track
+    capacity, not headcount.
+  Daily, 15 minutes
+    Clear the escalation queue, blocked items and track queue. Async first.
+  Weekly
+    Mark to market: objectives against items Confirmed. Set next week's
+    objectives. Check the Ready inventory covers two weeks. Promote
+    decisions into Atlas.
+  Monthly
+    Find where items waited longest and fix that one constraint. Rebalance
+    track allocation and roles.
+  Quarterly
+    Refresh the North Star and target state.
+
+Two things change in substance, not just in name:
+
+- Planning commits to outcomes, not to a sprint's worth of tickets. The
+  weekly objective is a result with a proof, and the backlog reorders freely
+  underneath it.
+- The demo is the proof bundle. Sprint reviews go away because evidence
+  arrives with every item.
+
+
+10. GUARDRAILS
+--------------
+
+Autonomy is granted by tier, and the tier is set by rule from what a change
+touches, never by the agent's own judgment.
+
+Tier 0
+  Change:       Tests, docs, refactors with no behaviour change, dependency
+                bumps
+  Before build: Nothing
+  To merge:     Agent merges after rung 2; humans audit a sample
+  To prod:      Normal pipeline
+
+Tier 1
+  Change:       Behaviour change in one service, behind a flag
+  Before build: Nothing
+  To merge:     One engineer approves the bundle
+  To prod:      Owner turns the flag on
+
+Tier 2
+  Change:       Cross-service change, or any API, contract or schema change
+  Before build: Owner approves the proofs
+  To merge:     Engineer and product approve
+  To prod:      Canary, then owner confirms
+
+Tier 3
+  Change:       Data migration, auth, security, money, anything irreversible
+  Before build: Human-led design
+  To merge:     Full human review
+  To prod:      Human-run release
+
+Hard rules
+
+- Agents hold no prod credentials. Prod changes go through the pipeline
+  only.
+- New behaviour ships flagged off. Rollback is automatic when a guardrail
+  metric moves.
+- Protected paths need human review whatever the tier: approved proofs,
+  pipeline config, tier rules, faker baselines.
+- Every run leaves an audit trail: contract, journal, bundle, approvals.
+
+Stop conditions
+
+An agent parks and escalates when any of these occur:
+
+- Its budget of hours, iterations or track time is spent.
+- The work needs a repo or service outside its scope.
+- The contract conflicts with an Atlas principle or decision.
+- A proof scenario is ambiguous or contradicts another.
+
+When something escapes
+
+A defect that reaches UAT or prod triggers three things: a regression test
+at the lowest rung that could catch it, an entry in Atlas lessons, and a
+check on whether the tier rule was too loose.
+
+
+11. METRICS
+-----------
+
+The weekly mark to market should show two things: whether outcomes moved,
+and which constraint is currently limiting flow.
+
+  Outcome
+    Weekly objectives met; North Star metric
+      -> Whether delivery is moving what matters
+  Flow
+    Items Confirmed per week; lead time from Ready to Confirmed
+      -> Real throughput
+    Wait time against work time at each rung
+      -> Where the constraint is
+  Proof quality
+    First-pass rate at each rung
+      -> Whether lower rungs are doing their job
+    Escapes: failures a lower rung should have caught
+      -> Trust in the ladder
+    Prod rollbacks and faker drift count
+      -> Trust in tracks and fakers
+  Capacity
+    Track wait time, reset time, utilisation
+      -> Whether to add tracks or enrich spotlights
+    Regression duration and flake rate
+      -> Cost of every proof
+  Humans
+    Review turnaround; escalation response time
+      -> Whether people are the bottleneck
+  Agents
+    Items finished without intervention; interventions per item; cost per
+    item
+      -> Whether contracts and the harness are good enough
+  Backlog
+    Days of Ready inventory
+      -> Whether intent is keeping up with capacity
+
+Each week, name the single longest wait and assign one change to shorten it.
+That habit, more than any metric, is what moves the ceiling.
+
+
+12. ROLLOUT
+-----------
+
+Convert one stream first, then scale what works. Automating an unproven loop
+across 50 engineers multiplies its flaws. Each phase ends at a gate counted
+in proven items.
+
+Phase 1. Pilot contract (weeks 1 to 2)
+  - One stream: one flow, about six engineers, two product
+  - Contract template, Atlas authority rules, proof bundle v0
+  - Queue repo with claim branches, track leases by hand
+  GATE: 3 items Track-proven, each with a bundle
+
+Phase 2. Closed loop, one stream (weeks 3 to 6)
+  - Spotlights as code and the standard harness commands
+  - Verifier agent, tier rules, protected proofs
+  - Full ladder to prod, with regression promotion
+  GATE: 10 items Regressed, lead time measured
+
+Phase 3. Scale to four streams (weeks 7 to 12)
+  - Git queue for every stream, lease branches with reset, merge train
+  - Mark-to-market dashboard and Atlas write-back
+  - Tier 0 auto-merge turned on
+  GATE: track wait and first-pass targets met
+
+Phase 4. Whole organisation (months 4 to 6)
+  - Every stream converted, roles reassigned
+  - Sprints retired, all work enters as contracts
+  - Unattended multi-day runs, weekly drift checks
+
+The timings are a proposal; the gates are what matter, and a phase does not
+end until its gate is met. The other streams keep their current process
+until phase 3 reaches them. After month six the work becomes the monthly
+constraint review: find the longest wait and remove it.
+
+
+13. OPEN DECISIONS
+------------------
+
+These need an answer before the pilot starts, because each one changes what
+gets built.
+
+[ ] The contract file template, how Jira issues map to it, and who mirrors
+    execution state back to Jira, since sessions can only read it.
+[ ] Who approves proofs and bundles at each tier, by name or by role.
+[ ] Whether tier 0 changes may merge with no human review from day one.
+[ ] How track results, logs and traces return to a closed workspace. This
+    doc assumes a git push triggers the track pipeline and the pipeline
+    commits results back.
+[ ] How many integrated UAT environments exist and who controls deploys
+    there. UAT is the likely next bottleneck after tracks.
+[ ] Whether prod has feature flags, canary rollout and automatic rollback
+    today, or whether those must be built first.
+[ ] Who owns faker fidelity, and how real responses are captured and
+    sanitised.
+[ ] The budget per item in agent hours and track hours, and the budget for
+    more tracks.
+[ ] Which flow and which people form the pilot stream.
+[ ] What the current pod leads move into, and how that is communicated.
