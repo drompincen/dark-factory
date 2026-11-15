@@ -1,0 +1,400 @@
+FEEDBACK ON THE DELIVERY SYSTEM
+===============================
+Reviewed 2026-11-15, against branch add-proof-driven-delivery-system
+
+Files reviewed:
+  proof-driven-delivery-system.txt   (the spec)
+  DELIVERY-AGENT.txt                 (the manual, v0.2)
+
+Part A measures the manual against the outcomes wanted from each single
+Claude Opus session among the 300 to 600. Part B lists places where the two
+files contradict each other. Part C ranks the fixes.
+
+Each gap is marked:
+  [MISSING]  the manual does not address it
+  [PARTIAL]  addressed, but not well enough to work at 300 to 600 sessions
+  [CONFLICT] the two files disagree
+
+
+PART A. GAPS AGAINST DESIRED OUTCOMES
+-------------------------------------
+
+A1. Start a single session and it asks for the Jira epic or story
+...................................................................
+
+Covered today: "Deliver PAY-1423." Part 3 step 6 asks whether to resume an
+item or take a new ticket. Part 5 handles "several tickets".
+
+Gaps:
+- [MISSING] Epics. The spec says larger work "is an epic that gets
+  decomposed". The manual has no epic path: read the epic, list its
+  children, find stories not yet written, draft one contract per story,
+  order them by dependency, and decide which ones this session claims.
+- [MISSING] The config can only read one ticket (read_command with {key}).
+  It cannot list an epic's children or run a JQL query.
+- [MISSING] The ticket type is never checked. An epic, story, bug, spike
+  and sub-task need different handling. A spike is a discovery item (spec
+  §3), and its output is a decision, not code.
+- [PARTIAL] Bootstrap depends on the human typing "Read DELIVERY-AGENT.txt
+  and follow it". The pointer in CLAUDE.md is only added at the end of
+  setup, with permission. A bare start does nothing until then.
+- [PARTIAL] Setup is per workspace. 300 to 600 sessions on 50 engineers'
+  machines would repeat the same interview many times (see A11).
+
+Suggested fix: add a Part 5 "Step 0. Identify the work" that takes an epic
+or story key, branches on issue type, and adds jira.list_children_command
+and jira.search_command to the config.
+
+
+A2. Find the Atlas project and llm-wiki for context
+.....................................................
+
+Covered today: Atlas discovery by folder shape, Atlas folders in config,
+order of authority.
+
+Gaps:
+- [MISSING] llm-wiki is not mentioned in either file. Nothing says what it
+  is, where it lives, how to read it, or where it sits in the order of
+  authority.
+- [CONFLICT] Spec principle 6 says "Atlas is the only source of truth".
+  If llm-wiki is a second source, the docs must say whether it binds or is
+  context only, and which wins when it disagrees with Atlas.
+- [MISSING] Ticket to Atlas project mapping. The manual assumes one Atlas
+  and one remit per engineer. Nothing maps a Jira project or component to
+  an Atlas project, remit page or flow. A session given a ticket outside
+  its configured remit has no way to find the right context.
+- [MISSING] Finding Atlas when it is not cloned. Discovery only looks
+  inside the workspace. A closed workspace needs a known remote URL to
+  clone, or a central "where things are" file.
+- [PARTIAL] The catalogs the spec says to add to Atlas (service, faker,
+  spotlight, proof, glossary) have no slots in config.atlas.folders, so
+  the agent is never told to read them.
+- [MISSING] Freshness. The spec warns that stale pages are worse than
+  missing ones, but the agent is never told to check a page's status or
+  date before trusting it.
+
+Suggested fix: add llm-wiki to config and to the order of authority, with
+an explicit binding/context rule. Add an "atlas.project_map" (Jira project
+or component -> Atlas project, remit, flows). Add the catalog folders.
+
+
+A3. Understand the test track, spotlight and remit constructs
+...............................................................
+
+Covered today: the spec explains all three. The manual uses them and asks
+about them in setup sections E and F.
+
+Gaps:
+- [MISSING] The manual never tells the agent to read the spec. "HOW TO
+  START" tells the human to put it in the workspace, and the agent is
+  told only to read the manual. Concepts such as rungs, merge train,
+  faker drift and holdout scenarios appear only in the spec.
+- [MISSING] There is no glossary in the manual. A session would have to
+  infer "spotlight", "track", "remit", "lease", "rung" and "bundle".
+- [PARTIAL] Remit is fixed per engineer in config. Nothing derives the
+  remit from the ticket, or handles a ticket that crosses remits (spec:
+  "remits follow outcomes, not repos").
+- [PARTIAL] Choosing a spotlight. The contract names one, but the manual
+  does not say how to pick it from the spotlight catalog, or what to do
+  when no spotlight covers the flow.
+- [PARTIAL] Track lease_method may be "unknown". Nothing says what Level 2
+  looks like when leases are handed out by a person.
+
+Suggested fix: add a one-page "Concepts" part to the manual with a glossary
+and a pointer to the spec sections. Add "pick the spotlight" and "pick the
+remit" to Part 5 step 1.
+
+
+A4. Document and evidence changes with success criteria and proof
+...................................................................
+
+Covered today: contract, proofs.json, journal, bundle SUMMARY template,
+failing-first output, verifier findings, "not tested". This is the
+strongest part of the manual.
+
+Gaps:
+- [PARTIAL] The contract template has no "proof per rung" field, although
+  the spec lists one. Only local proofs and a prod signal are captured.
+  UAT and track proofs are implicit.
+- [PARTIAL] The template has no stop_conditions field, though spec §3
+  lists it as a contract field.
+- [MISSING] Success criteria wording. Nothing says what a measurable
+  success criterion looks like (a threshold, a response, an observable
+  state) or how vague ticket acceptance is turned into one beyond "becomes
+  a question".
+- [MISSING] UI and CLI evidence. The spec requires screenshots or
+  recordings for UI flows. The manual's bundle does not ask for them, and
+  says nothing about large binaries in git (size limits, LFS, or where
+  artifacts go instead).
+- [PARTIAL] Rule 3 ("evidence or it did not happen") depends on a hook the
+  manual only proposes (Part 4 step 6c). Without it, nothing enforces it.
+- [MISSING] Jira gets none of this. Jira is read-only and the open
+  decision on mirroring state back is unresolved, so people watching Jira
+  see no progress or evidence.
+- [MISSING] Holdout scenarios. The agent is never told that product holds
+  back scenarios it cannot see. It should not report full confidence, and
+  should expect UAT surprises.
+
+Suggested fix: add proofs_by_rung and stop_conditions to the contract,
+require screenshots or transcripts for UI and CLI flows, and say where
+large evidence is stored.
+
+
+A5. Deliver in a closed loop
+..............................
+
+Covered today: spotlight loop, git-triggered tracks, results back through
+git, keep-or-revert, verifier subagent, Levels 0 to 3.
+
+Gaps:
+- [MISSING] Waiting for track results. Nothing says how a session waits:
+  how often it polls the results path, how long before it gives up, or
+  what it does meanwhile. The spec suggests improvement loops while
+  waiting; the manual says only "do not wait idle".
+- [MISSING] Permissions for unattended runs. A long run stops at the first
+  permission prompt. There is no guidance on permission mode, allowlists
+  or which commands must be pre-approved.
+- [PARTIAL] Budgets in hours. A session cannot measure elapsed time unless
+  it timestamps the journal. Say so, and count from the claim time.
+- [PARTIAL] Context exhaustion on multi-hour runs. The journal helps, but
+  there is no rule to checkpoint and restart from the journal before the
+  context fills.
+- [PARTIAL] Rebasing. Long items drift from the default branch while other
+  sessions merge. Nothing says to rebase, or re-run rung 1, before a track
+  deploy or before opening merge requests.
+
+Suggested fix: add a "waiting" section (poll interval, timeout, what to do
+meanwhile), a permissions section in setup, and a "rebase and re-prove
+before rung 2" step.
+
+
+A6. Other sessions know the work was picked up, and by whom
+............................................................
+
+Covered today: claim/<KEY> branch, first push wins, owner_engineer in the
+contract.
+
+Gaps:
+- [MISSING] The claim comes too late. Part 5 claims at Step 6, after the
+  read, restatement, contract draft and approval. Two sessions can both
+  spend that time on the same ticket. Claim, or soft-claim, first.
+- [PARTIAL] "By whom" is only the engineer. With 6 to 12 sessions per
+  engineer it should name the engineer, machine, session id, start time and
+  last heartbeat.
+- [MISSING] Heartbeat. The spec says a pipeline job releases claims "that
+  have gone quiet", but the manual never says how or when a session shows
+  it is alive.
+- [PARTIAL] The first-push-wins lock depends on server-side branch
+  protection that the spec says to configure but the manual never checks
+  during setup.
+- [MISSING] Epic-level claims. There is no way to see that an epic is being
+  decomposed by someone, so two sessions can decompose it twice.
+- [PARTIAL] No board. The spec's board job does not exist yet, so humans
+  have no view of who holds what (see A10).
+
+Suggested fix: make the claim the first write, add a claim.yaml with
+engineer, machine, session, started_at and heartbeat_at, and push a
+heartbeat at each journal update.
+
+
+A7. Share in-progress work across machines and resume elsewhere
+.................................................................
+
+Covered today: journal with "Resume from", item/<KEY> branches, Part 3
+resume flow.
+
+Gaps:
+- [MISSING] No push rule. Step 9 says commit at every green step, but the
+  only push is at park or at the end. A crashed or switched machine loses
+  everything not pushed. Push item/<KEY> and the claim branch after every
+  green commit and every journal update.
+- [PARTIAL] Part 3 finds only items "whose contract names this engineer".
+  Handing an item to another engineer, or picking up an abandoned one, has
+  no transfer step.
+- [MISSING] Two machines can resume the same item at once. The claim
+  locks the item, not the active session. It needs an "active session"
+  marker inside the claim, taken and released explicitly.
+- [MISSING] Local state is not portable. delivery.config.yaml, a running
+  spotlight and staged fakers live on one machine. Faker scenarios are
+  committed, but the config and the exact spotlight command used are not.
+- [PARTIAL] Uncommitted exploration and dead ends live only in context
+  until written down. The journal rule (rule 10) helps only if the journal
+  is pushed.
+
+Suggested fix: add a rule to push after every commit, an active-session
+marker with take-over rules, and record the exact spotlight and faker
+commands in the journal so another machine can rebuild the same state.
+
+
+A8. Find out whether the work is already done
+...............................................
+
+Covered today: step 8 catches a proof that passes before implementation.
+Nothing else.
+
+Gaps:
+- [MISSING] No pre-check before starting. Before drafting a contract the
+  session should check:
+    - Jira status and resolution, and linked or duplicate issues
+    - closed items on the queue default branch (Regressed items merge
+      there) and any open claim/<KEY>
+    - git log --grep=<KEY> in every repo in scope, and merged MRs
+    - Atlas decisions and agreed flows that already describe the behaviour
+    - the running product: drive the flow in a spotlight and see if it
+      already behaves as asked
+- [MISSING] Near-duplicates. The same work under a different key, or
+  partly done by another item, is never searched for.
+- [MISSING] An outcome for "already done". There is no state or report
+  for "already satisfied, here is the evidence", which saves a whole
+  delivery.
+
+Suggested fix: add a Part 5 "Step 0b. Is it already done?" with the checks
+above, and an "Already satisfied" verdict with its own small bundle.
+
+
+A9. Challenge the ask against the North Star in Atlas
+.......................................................
+
+Covered today: outcome_link field, "stop and ask" on conflict with a
+principle or decision, restating the problem without adopting the
+ticket's theory.
+
+Gaps:
+- [PARTIAL] Only conflict is checked. The agent is never asked whether the
+  ticket moves the North Star at all, whether it moves this week's
+  objective, or whether a smaller change gets the same outcome.
+- [MISSING] No empty-outcome rule. If no North Star line or objective can
+  be linked, the session should raise it, not fill the field loosely.
+- [MISSING] No challenge format. There is no template for "I think this
+  ask is wrong, or lower value than X, because Y", or rule that product
+  answers it.
+- [MISSING] The weekly mark to market and target state are not used to
+  check priority, or to flag work on a flow marked legacy.
+
+Suggested fix: add a "Step 2b. Challenge" with three checks (moves the
+North Star, fits current objectives, not extending a legacy flow), a
+challenge section in the contract, and an escalation to product when
+any check fails.
+
+
+A10. Orient among the other 300 to 600 sessions
+...............................................
+
+Covered today: own items in Part 3, git as the control plane, one file per
+item. The board is a future pipeline job.
+
+Gaps:
+- [MISSING] No look outward. The manual never lists other claims. A
+  session should run git ls-remote on the queue for claim/*, lease/* and
+  escalations, and read the scope of claims that touch its repos, services
+  or flows.
+- [MISSING] Overlap detection. Two items changing the same files or flow
+  will collide at integration. Nothing tells the session to check, to
+  coordinate, or to record a dependency.
+- [MISSING] Dependencies between items, across engineers, have no field in
+  the contract (depends_on, blocks).
+- [MISSING] Track queue visibility: how many leases are taken, who is
+  waiting, and so whether to go to rung 2 now or do rung 1 work.
+- [PARTIAL] Scale. Fetching 600 claim branches in full is slow. Say to use
+  ls-remote plus a small index, or a pipeline-built board file on the
+  default branch.
+- [MISSING] Orientation summary. Part 3 step 6 reports only the session's
+  own items. Add "who else is near this work" to it.
+
+Suggested fix: add a Part 3 step "Look around" and a depends_on field.
+Ask the harness team to build the board as a single generated file in the
+queue repo, so each session reads one file and not 600 branches.
+
+
+A11. If it cannot do any of the above, find out how
+.....................................................
+
+Covered today: setup interview, "record unknowns", Levels 0 to 3, "build
+the verification skill first", escalation files.
+
+Gaps:
+- [MISSING] Search before asking. Before asking the engineer, look in
+  Atlas, llm-wiki, the remit page and other engineers' published configs.
+  The manual only discovers the local workspace.
+- [MISSING] Shared environment knowledge. Each of 50 engineers repeats the
+  same interview. Answers that are the same for everyone (Atlas remote,
+  queue remote, track trigger, results path) should be published once,
+  for example environment/ in the queue repo or an Atlas page, and read
+  first during setup.
+- [MISSING] A path for missing capabilities. When a capability is missing
+  (no Jira read, no track results path, no llm-wiki access), the session
+  should write a harness-team request with what it needs and why, not only
+  record "unknown".
+- [MISSING] Manual versioning. Every workspace holds its own copy, so 600
+  copies drift. The manual should live in a repo, and Part 3 should pull
+  it and check the version on start.
+- [PARTIAL] Size. 754 lines loaded on every start is costly and gets
+  skimmed. Part 4 step 6d already proposes a skill; make it the default
+  and keep the always-loaded part short.
+
+Suggested fix: add a "find how" order: search Atlas and llm-wiki, read the
+shared environment file, ask the engineer, then file a harness request.
+Move the manual into a shared repo with a version check.
+
+
+PART B. CONTRADICTIONS BETWEEN AND WITHIN THE FILES
+---------------------------------------------------
+
+B1. [CONFLICT] Spec §1 line 25 says "Six principles" and lists eight.
+
+B2. [CONFLICT] Tier 2 and 3 proof approval comes before the proofs exist.
+    The manual approves "contract and proofs" at step 5. Proofs are written
+    at step 8, which says they "were approved in step 5". The spec approves
+    the written failing proofs before implementation.
+
+B3. [CONFLICT] Rule 4 says only "passes" may change in proofs.json. Step 8
+    says to fix or drop a proof that passes before implementation. The
+    template's wording ("after approval") is the right one; use it in
+    rule 4.
+
+B4. [CONFLICT] Who approves proofs: spec §10 Tier 2 says "Owner". Spec §8
+    and the manual say the remit lead.
+
+B5. [CONFLICT] After parking, spec §6 says the session "takes another
+    item". The manual says one item per session and start a fresh one.
+
+B6. [CONFLICT] Order of authority: the manual puts the remit page between
+    decisions and agreed flows. Spec §4 does not list remit pages.
+
+B7. [CONFLICT] Stop conditions: spec §10 lists four and omits "same
+    failure three times", which spec §6 and the manual both include.
+
+B8. [CONFLICT] Spec §8 gives each engineer "6 to 12 Claude sessions" with
+    no qualifier. The earn-parallelism steps start at one.
+
+B9. [PARTIAL] Step 16 says "merge the claim branch if the config allows
+    it". The config has no such field.
+
+B10. [PARTIAL] Spec budgets include iterations; the config budgets do not.
+
+B11. [PARTIAL] Neither file is linked from README.md or index.html, so the
+     GitHub Pages site does not show them.
+
+B12. [PARTIAL] The last two links in spec §14 have not been checked.
+
+
+PART C. PRIORITY
+----------------
+
+Fix first. Without these, 300 to 600 sessions collide or redo work:
+  1. A6  Claim first, with session identity and a heartbeat
+  2. A7  Push after every commit; active-session marker for resume
+  3. A8  "Already done?" check before any drafting
+  4. A10 Look at other claims and detect overlap
+  5. A2  Define llm-wiki and its authority; map tickets to Atlas projects
+
+Fix next. Without these, sessions start badly or deliver the wrong thing:
+  6. A1  Epic intake and decomposition
+  7. A9  North Star challenge step
+  8. A11 Shared environment file and versioned manual
+  9. A3  Concepts and glossary in the manual; tell it to read the spec
+
+Then tighten:
+ 10. A5  Waiting, permissions, rebase before rung 2
+ 11. A4  Proofs per rung, UI evidence, Jira mirroring
+ 12. Part B contradictions (each is a one-line edit)
