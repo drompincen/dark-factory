@@ -1,0 +1,21 @@
+# Decomposition of epic {{KEY}}, started {{NOW}} by {{SESSION}}.
+# One entry per story. Existing Jira stories keep their key. A story that
+# should exist but does not gets a proposed entry for product to create,
+# because sessions cannot write to Jira.
+epic: {{KEY}}
+outcome_link:            # the Atlas objective this epic moves
+stories:
+  - key:                 # Jira key, or "proposed-1" until product creates it
+    title:
+    status: existing     # existing | proposed
+    covers:              # which part of the epic's acceptance this delivers
+    remit:
+    depends_on: []       # other stories in this list that must land first
+    contract: children/KEY.yaml   # the drafted contract, on this claim branch
+    contract_status: drafted      # drafted | approved | claimed
+order: []                # story keys in delivery order, dependencies first
+not_covered:             # epic acceptance that no story delivers yet
+  -
+proposed_stories_for_product: >
+  For each proposed story: title, the acceptance it carries, and why the
+  epic needs it. Product creates these in Jira and replies with the keys.

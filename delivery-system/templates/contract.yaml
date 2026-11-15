@@ -1,0 +1,66 @@
+# Work contract for {{KEY}}.
+# Keep the keys at these levels. dq reads approved_by, tier and budget.
+key: {{KEY}}
+title:
+kind: story               # story | bug | task | spike | epic
+epic:
+remit:                    # the remit whose lead approves this
+other_remits: []          # other remits whose flows this touches
+owner_engineer: {{ENGINEER}}
+owner_product:
+approved_by:              # name and date. Engineer for every tier.
+tier:                     # 0, 1, 2 or 3. The highest that applies.
+outcome_link:             # Atlas objective or North Star line this moves
+problem: >
+  The problem restated in your own words.
+intent: >
+  Two or three sentences: the result for the user or the business.
+scope:
+  repos: []
+  services: []
+  flows: []
+  out_of_scope: []
+depends_on: []            # items that must land first
+blocks: []                # items waiting on this one
+constraints:              # Atlas pages that bind this work, with status and date
+  -
+spotlight:                # the spotlight that proves it locally, or "none fits"
+challenge:
+  moves_north_star:       # yes | no | unclear, and the line it moves
+  in_current_objectives:  # yes | no, and which mark-to-market week you checked
+  extends_legacy_flow:    # no | yes, and which flow
+  smaller_change:         # none found | the smaller change that would do
+  result:                 # passed | raised (see challenge.md) | product said go
+success_criteria:
+  # One entry per criterion. Each names what is observed, the exact
+  # condition, and how it is observed. See DELIVER.txt, step 6.
+  - id: C1
+    observed:             # a response, a stored record, an event, a screen, a number
+    condition:            # the exact value, threshold or range
+    how:                  # the command or step that observes it
+proof_scenarios:
+  - id: S1
+    criteria: [C1]
+    given:
+    when:
+    then:
+    faker_responses: []
+proofs_by_rung:           # which scenarios are proven at which rung
+  local: [S1]
+  track: [S1]
+  uat: []                 # product runs these, plus holdouts you cannot see
+  prod: []                # confirmed by prod_signal
+prod_signal:
+  metric:
+  threshold:
+  watch_window:
+regression_plan:
+  - scenario: S1
+    rung: local
+stop_conditions:          # item-specific ones, on top of the standard list
+  -
+budget:
+  hours: 8
+  iterations: 60
+  track_runs: 3
+open_questions: []

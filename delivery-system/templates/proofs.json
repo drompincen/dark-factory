@@ -1,0 +1,13 @@
+[
+  {
+    "id": "P1",
+    "scenario": "S1",
+    "rung": "local",
+    "description": "",
+    "command": "",
+    "cwd": "",
+    "timeout_s": 900,
+    "evidence": "bundle/rung1/P1.txt",
+    "passes": false
+  }
+]

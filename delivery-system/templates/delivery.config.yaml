@@ -1,0 +1,53 @@
+# delivery.config.yaml - the facts of this workspace.
+#
+# The shared environment file (environment.yaml in the delivery system
+# directory) holds what is the same for everyone. Put here only what is
+# particular to this engineer and this machine, or what must differ from
+# the shared file. Where both give a value, this file wins.
+#
+# Two levels only, two-space indent: dq reads it with a simple reader.
+setup_complete: false
+level:                        # 0 to 3, set at the end of setup
+engineer:
+  name:                       # short, no spaces; it appears in session ids
+workspace:
+  root:                       # absolute path of the workspace root
+  machine:                    # defaults to the hostname
+  memory_gb:
+  spotlight_from_worktree:    # yes | no: can a spotlight run code from a worktree?
+remit:
+  name:
+  lead:
+  page:                       # path of the remit page inside Atlas
+  sessions_per_engineer: 1
+queue:
+  path:                       # local clone of the queue repo (clone it --single-branch)
+atlas:
+  path:                       # local clone of Atlas
+repos:
+  - name:
+    path:
+    default_branch:
+    build:
+    lint:
+    unit_test:
+    contract_test:
+jira:
+  access:                     # cli | tool | http | paste
+  read_command:               # {key} is replaced by the issue key
+  children_command:           # lists the stories of an epic: {key}
+  search_command:             # {query} is replaced by search text
+verified:                     # pass | fail | unknown, each with its date
+  atlas_read:
+  jira_read:
+  jira_children:
+  queue_fetch:
+  queue_claim:
+  queue_protected:
+  repo_tests:
+  spotlight:
+  faker_stage:
+  verify_flow:
+  track_deploy:
+  merge_request:
+  unattended_permissions:

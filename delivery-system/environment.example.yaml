@@ -1,0 +1,111 @@
+# environment.yaml - facts that are the same for every workspace.
+#
+# Copy this file to environment.yaml, beside the manual in the shared repo,
+# and fill it in once. Every session reads it before it asks anyone
+# anything, so an answer given here is never asked for again. Change it by
+# merge request; the harness team owns it.
+#
+# Two levels only, two-space indent: dq reads it with a simple reader.
+# A workspace's own delivery.config.yaml wins where both give a value.
+
+system:
+  remote:                     # git URL of the repo that holds this directory
+  path_in_repo: system        # where this directory sits inside that repo
+
+queue:
+  remote:                     # git URL of the queue repo
+  default_branch: main
+  push_options:               # e.g. ci.skip, so heartbeat pushes start no pipelines
+  close_method: merge_request # how a finished claim reaches the default branch:
+                              # merge_request | pipeline | manual
+
+atlas:
+  remote:
+  default_branch: main
+  format: llm-wiki            # an index page, linked pages, a log, a schema page
+  index: index.md             # read this first
+  log: log.md                 # append-only record of what changed and when
+  schema:                     # the page that says how Atlas is organised
+  stale_after_days: 90        # older pages are checked before they are trusted
+  north_star:
+  principles:
+  decisions:
+  remits:
+  agreed_flows:
+  legacy_flows:
+  flow_map:
+  target_state:
+  lessons:
+  mark_to_market:
+  service_catalog:
+  faker_catalog:
+  spotlight_catalog:
+  proof_catalog:
+  glossary:
+  project_map:                # page mapping each Jira project and component to
+                              # its Atlas area, remit, flows and repos
+
+knowledge:
+  llm_wiki: atlas             # "atlas" when the llm-wiki is Atlas itself;
+                              # otherwise the git URL of the separate wiki
+  llm_wiki_binding: no        # a separate wiki is context only, unless an Atlas
+                              # decision says otherwise
+  other_sources:              # comma list of other context-only sources
+
+jira:
+  access:                     # cli | tool | http | paste
+  read_command:               # {key} is replaced by the issue key
+  children_command:           # lists the stories of an epic: {key}
+  search_command:             # {query} is replaced by search text
+  mirror: engineer            # who posts each item's jira-update.md: job | engineer
+
+code:
+  remote_base:                # prefix of the code repos' git URLs
+  merge_request_create: push_option   # push_option | manual
+  merge_request_target: main
+
+spotlights:
+  list_command:
+  start_command:              # {name} is replaced by the spotlight name
+  stop_command:
+  health_command:
+
+fakers:
+  path:
+  how_to_stage:
+
+tracks:
+  names:                      # comma list: track-01, track-02, ...
+  lease_method: branch        # branch | assigned | unknown
+  lease_minutes: 90
+  deploy_trigger:             # exactly what makes a track deploy a change set
+  results_path:               # repo, branch and path the pipeline writes results to
+  poll_minutes: 5             # how often a waiting session looks for results
+  park_after_minutes: 30      # wait this long in-session, then park
+  result_timeout_minutes: 120 # no result by then is a stop condition
+  reset:
+
+coordination:
+  session_stale_minutes: 120  # a silent session may be taken over after this
+  claim_quiet_days: 3         # a quiet claim is flagged for the remit lead
+  board_stale_minutes: 30
+  look_max_without_board: 200
+  spot_stale_minutes: 60
+
+evidence:
+  location: branch            # branch: evidence/KEY in the queue repo
+                              # path:/shared/dir: a shared directory
+  max_file_kb: 512            # larger files never go on a claim branch
+  lfs: no
+
+guardrails:
+  protected_paths:            # comma list of globs that need the engineer's approval
+  auto_merge:                 # comma list of change types a remit lead allows
+
+budgets:
+  hours_per_item: 8
+  iterations_per_item: 60
+  track_runs_per_item: 3
+
+permissions:
+  unattended_mode: dontAsk    # Claude Code permission mode for unattended runs
