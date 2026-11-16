@@ -1,0 +1,108 @@
+TEMPLATES: EVERY FILE YOU WRITE
+===============================
+Part of the delivery manual, v0.3.
+
+Do not write these files from memory. "dq new KEY <kind>" copies the
+template into the item's directory with the key, time and session filled
+in. The templates are in templates/, beside this manual.
+
+An item's directory ("dq path KEY") is saved to branch claim/KEY in the
+queue repo by every "dq beat". It holds small text only.
+
+  File                      Made by                 What it is
+  ------------------------  ----------------------  ------------------------
+  claim.yaml                dq claim                The card: who holds the
+                                                    item, the active session,
+                                                    the heartbeat, the scope.
+                                                    Never edit it by hand.
+  journal.md                dq claim                Your working memory: the
+                                                    problem, the plan, how to
+                                                    rebuild local state, the
+                                                    timestamped log, attempts,
+                                                    decisions, dead ends,
+                                                    "Resume from".
+  contract.yaml             dq new KEY contract     The definition of done.
+  proofs.json               dq new KEY proofs       One entry per proof.
+                                                    Frozen by "dq freeze".
+  challenge.md              dq new KEY challenge    An objection to the ask,
+                                                    for product to answer.
+  escalations/KEY-n.md      dq new KEY escalation   One question to one
+                              --to "WHO"            person. They write under
+                                                    "Answer:".
+  decomposition.yaml        dq new KEY              An epic split into
+                              decomposition         stories, with proposed
+                                                    stories for product.
+  children/STORY.yaml       you, from               A drafted contract for a
+                            contract.yaml           story of an epic.
+  track-handoff.md          dq new KEY handoff      What a person needs to
+                                                    run the track rung for
+                                                    you (Level 1).
+  bundle/verification.md    dq new KEY              The fresh-eyes findings
+                              verification          and what you did.
+  bundle/SUMMARY.md         dq new KEY summary      The verdict first, then
+                                                    the evidence.
+  bundle/rung1/, rung2/     you                     Saved outputs,
+                                                    transcripts, results.
+  jira-update.md            dq new KEY jira         The comment for the
+                                                    ticket. Rewritten at
+                                                    each state change.
+  history.log               dq                      Every state change,
+                                                    freeze, takeover, with
+                                                    who and when.
+
+Outside the item:
+
+  request.md                copy, then              A missing capability, for
+                            dq request SLUG FILE    the harness team.
+  delivery.config.yaml      dq install, then setup  The facts of this
+                                                    workspace.
+  remit-page.md             the remit lead          The standard for a remit,
+                                                    kept in Atlas.
+
+
+The fields dq reads
+-------------------
+
+Keep these exactly where the templates put them.
+
+  contract.yaml    approved_by   empty means not approved
+                   tier          0, 1, 2 or 3
+                   budget:       hours, iterations, track_runs
+  proofs.json      id, rung, command, cwd, timeout_s, evidence, passes
+  journal.md       each "### Attempt N" heading counts as one iteration
+  escalations/     the To: line and the Answer: line
+  request.md       Status:, From:, Date:, and the first line as its title
+
+
+Proofs
+------
+
+  rung       local, track, uat or prod
+  command    run from cwd, which is relative to the workspace root unless
+             it starts with /. Exit code 0 means the proof passes.
+  evidence   where the output is saved, relative to the item's directory.
+             A proof cannot be marked passing until this file exists.
+  passes     false until you have run the command and saved its output.
+
+"dq check-proofs KEY --rung local" re-runs every proof marked passing and
+says which no longer pass. "dq state" does the same before it records
+Local-proven.
+
+
+The summary
+-----------
+
+One page, verdict first. The template's sections, in order:
+
+  Verdict                  the state reached, in one line
+  Change set               repo, branch and commit for every repo
+  Environment              the spotlight or track used
+  Proofs                   each scenario, its result, where its output is
+                           saved, and the failing-first output
+  Evidence stored outside  where each large file went, as "dq evidence"
+    the claim              printed it
+  Verification findings    what the fresh-eyes check found, and what you did
+  Verified against         the visible proofs only
+  Not tested               everything in scope that has no proof, and why
+  Risks and decisions      what a reviewer should look at first
+    to check

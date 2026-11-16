@@ -1,0 +1,54 @@
+CHANGELOG
+=========
+
+A session that finds itself behind (dq version --check) reads the entries
+newer than its own version and re-reads the parts they name.
+
+
+0.3.0   2026-11-15
+------------------
+Re-read: everything. The manual was restructured.
+
+Answers the review in FEEDBACK.txt; FEEDBACK-RESOLUTION.txt in the repo
+root maps each point to its fix.
+
+- The manual is now a short core, DELIVERY-AGENT.txt, plus parts read on
+  demand under manual/. Rules were renumbered: there are sixteen.
+- New tool, tools/dq, does the coordination that v0.2 described in prose.
+- Claim first. A session claims a ticket before it reads or drafts, and
+  the claim carries the engineer, machine, session, start time and
+  heartbeat.
+- One active session per item, taken and released explicitly, with rules
+  for takeover, handover and resuming on another machine.
+- Save and push after every green commit and every journal update.
+- New steps in delivery: identify the work by issue type (epic, story,
+  bug, spike, sub-task); "is it already done?"; challenge the ask against
+  the North Star; catch up with the default branch and re-prove before a
+  track run.
+- Look around: other claims near your work, overlap, dependencies, tracks,
+  open questions, on one generated board.
+- Tiers 2 and 3: the remit lead approves the written, failing proofs.
+  Approval no longer comes before the proofs exist.
+- The contract gains proofs by rung, stop conditions, dependencies, a
+  challenge block and an iterations budget.
+- Evidence by kind of flow; large files leave the claim branch.
+- Waiting for a track and for results has intervals and limits.
+- Setup reads a shared environment file before asking, publishes each
+  workspace's config, and covers permissions for unattended runs.
+- Track leases are never deleted. A lease branch is updated in place.
+- Atlas is described as an llm-wiki: index, log, schema, page status and
+  freshness. Other sources are context only.
+- New states beside the main line: Satisfied, Cancelled, Decomposed.
+  New holds: challenge, waiting-track, waiting-results, waiting-approval,
+  waiting-answer, parked.
+
+
+0.2     2026-11-14
+------------------
+- Remit leads, verification skills, flow map, keep or revert, improvement
+  loops, earning parallelism.
+
+
+0.1     2026-11-14
+------------------
+- First agent manual: setup interview, delivery steps, templates.

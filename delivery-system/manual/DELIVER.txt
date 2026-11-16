@@ -69,9 +69,12 @@ Step 1. Claim it
             journal.
   TAKEN     Someone holds it. Stop, and tell the engineer who. Do not
             work on it alongside them.
-  CLOSED    It was delivered before. Read items/KEY/ on the queue's
-            default branch and carry what it says into step 2. Claim
-            again with --reopen only if step 2 shows real work remains.
+  CLOSED    It was closed before: delivered, already satisfied, or
+            cancelled. Read why and tell the engineer:
+                dq show KEY bundle/SUMMARY.md
+            More work on a closed item is normally a new ticket. Claim it
+            again with --reopen only if the engineer confirms real work
+            remains on this key.
 
 As soon as you know them, put the scope on the card so others can see what
 you will touch, then look at who is near:
@@ -188,6 +191,10 @@ Step 6. Draft the contract and the proof list
 
     dq new KEY contract
     dq new KEY proofs
+
+If the story came out of a decomposed epic, a draft exists. Start from it:
+
+    dq show EPIC children/KEY.yaml
 
 The contract is your definition of done. Say what and why; leave how for
 the plan.
@@ -481,8 +488,11 @@ the humans have acted:
 Step 19. After the humans act
 -----------------------------
 
-Review comments: take the item again, address them, re-run the affected
-proofs, update the bundle.
+The item was released in step 18, so whichever session acts next takes it
+first:    dq take KEY
+
+Review comments: address them, re-run the affected proofs, update the
+bundle.
 
 UAT. Product runs its scenarios, including ones you have never seen. A
 failure there is normal information. Fix the cause, and add a rung 1 proof
@@ -529,7 +539,7 @@ An epic is not delivered; it is split into stories that are.
 8. This session may now deliver the first story nothing blocks: step 1,
    with --epic EPIC, starting from its drafted contract. The other
    stories are for other sessions. They find the drafts with:
-       git show origin/claim/EPIC:items/EPIC/children/STORY.yaml
+       dq show EPIC children/STORY.yaml
 
 When product has created the proposed stories, a session takes the epic
 again and replaces the placeholders with the real keys.
@@ -548,9 +558,12 @@ branches and no tier.
   contracts for follow-up stories, or both.
 
 When the engineer accepts the answers, write the summary (questions,
-answers, evidence, the decision) and record it:
+answers, evidence, the decision) and the Jira comment, and record it:
 
+    dq new KEY summary
+    dq new KEY jira
     dq state KEY -s SESSION Satisfied
+    dq release KEY -s SESSION
 
 
 VERIFICATION SKILLS

@@ -547,5 +547,40 @@ run dq_m m1 state PAY-8 -s "$S8" Cancelled --by "product-kim"; want_rc "a person
 want_grep "the history names who confirmed it" "$D8/history.log" 'Cancelled by=product-kim'
 run dq_m m1 help;                   want_out "help lists the commands" 'dq claim KEY'
 
+section "closed items and quiet claims"
+run dq_m m3 claim PAY-8;            want_rc "an item in a closed state is not claimed again" 3
+want_out "the refusal says it is closed, and how" '^CLOSED=PAY-8$'
+want_out "the refusal gives the closed state" '^STATE=Cancelled$'
+run dq_m m3 claim PAY-8 --reopen;   want_rc "reopening waits until the claim is archived" 5
+run dq_m m1 look --prefix PAY-8;    want_out "closed items leave the open count" '^OPEN_CLAIMS=0$'
+run dq_m m3 done-check PAY-8;       want_out "done-check says the claim is closed" 'open claim: no \(closed, state Cancelled\)'
+run dq_m m3 whois PAY-8;            want_out "whois marks a closed item" '^CLOSED=PAY-8$'
+run dq_m m3 show PAY-8;             want_out "show lists another item's files" '^bundle/SUMMARY.md$'
+run dq_m m3 show PAY-8 claim.yaml;  want_out "show prints one of them" '^state: Cancelled$'
+run dq_m m3 show PAY-8 nope.md;     want_rc "show says when a file is not there" 1
+run dq_m m2 show PAY-9 claim.yaml;  want_rc "show reads an open item too" 0
+run dq_m m1 claim PAY-11;           S11="$(val SESSION)"
+run dq_m m1 release PAY-11 -s "$S11" --hold parked --reason "nobody is on it"
+run dq_m m1 board --publish          # the pipeline job would do this
+run dq_m m1 look;                   want_out "a fresh release is not quiet yet" '^QUIET_CLAIMS=0$'
+DQ_QUIET_DAYS=0 run dq_m m1 look --quiet
+want_out "look counts claims nobody has touched for too long" '^QUIET_CLAIMS=[1-9]'
+want_out "look --quiet lists them" 'PAY-11'
+DQ_QUIET_DAYS=0 run dq_m m1 board
+want_out "the board has a quiet-claims section" '^## Quiet claims$'
+want_out "the board lists the quiet claim there" '^\| PAY-11 \| Draft \| parked '
+want_no "the board leaves closed items out" '^\| PAY-8 '
+
+
+section "the board job, and proofs that run anywhere"
+git clone -q "$T/server/queue.git" "$T/ci-queue"
+run env DQ_QUEUE="$T/ci-queue" DQ_ENGINEER=board-job DQ_MACHINE=ci DQ_WORKSPACE="$T/ci-ws" "$DQ" board --publish
+want_out "a pipeline job can publish the board with no config file" '^PUBLISHED=board$'
+run dq_m m1 claim PAY-12;           S12="$(val SESSION)"; D12="$(val ITEM_DIR)"
+mkdir -p "$T/m1/app/sub" "$D12/bundle/rung1"; echo marker > "$T/m1/app/sub/here.txt"; echo out > "$D12/bundle/rung1/P1.txt"
+printf '[{"id":"P1","scenario":"S1","rung":"local","description":"","command":"test -f here.txt","cwd":"app/sub","timeout_s":30,"evidence":"bundle/rung1/P1.txt","passes":true}]\n' > "$D12/proofs.json"
+run dq_m m1 check-proofs PAY-12 --rung local
+want_out "a proof's cwd is taken from the workspace root" '^P1: PASS'
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 if [ "$FAIL" -gt 0 ]; then exit 1; fi

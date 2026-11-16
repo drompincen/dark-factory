@@ -150,9 +150,16 @@ Who may take what:
   The card records the previous holder and the reason.
 - Another engineer's item with a live session: never.
 
-Abandoned items. A claim with no active session and no heartbeat for
-coordination.claim_quiet_days is flagged on the board. The remit lead
-decides who takes it over. Do not take one on your own initiative.
+Abandoned items. A claim with no active session and no save for
+coordination.claim_quiet_days is listed as quiet, on the board and by
+"dq look --quiet". The remit lead decides who takes each one over. Do not
+take one on your own initiative.
+
+Closed items. An item in state Regressed, Satisfied, Cancelled or
+Decomposed is closed. It leaves the board, and "dq claim" answers CLOSED.
+Its record stays readable with "dq show KEY". Its files reach the queue's
+default branch the way queue.close_method says, and the harness team's job
+archives the branch afterwards. A session never deletes one.
 
 
 5. Resuming on another machine
@@ -182,7 +189,9 @@ your engineer's other configs are published (dq configs).
     dq look --all            every open item
     dq look --prefix PAY-    only keys that start with PAY-
     dq look --to "remit lead"    open questions addressed to a role
+    dq look --quiet          claims nobody has touched for days
     dq inbox                 only the open questions
+    dq show KEY [FILE]       read any item's files; no FILE lists them
 
 dq reads one generated file, the board, when the harness team's job
 publishes it. Until then it reads the claims directly, which is fine for
@@ -197,7 +206,7 @@ What to report to the engineer from it:
   same-flow, same-epic, you-depend-on-it, it-depends-on-you.
 - SILENT_SESSIONS among your engineer's own items: they may need
   replacing.
-- FLAGGED_PROOFS, if your engineer is a remit lead.
+- FLAGGED_PROOFS and QUIET_CLAIMS, if your engineer is a remit lead.
 - Whether a track is free, and how many items are waiting for one.
 
 
@@ -213,8 +222,8 @@ are integrated. Find out before a track run, not after.
 When there is overlap, or "dq look --near" shows same-flow:
 
 1. Read the other item's contract and the top of its journal:
-       git -C <queue> fetch origin claim/OTHER
-       git -C <queue> show FETCH_HEAD:items/OTHER/contract.yaml
+       dq show OTHER contract.yaml
+       dq show OTHER journal.md
 2. Decide the order with its owner. Ask with an escalation in your own
    item, addressed to them:
        dq new KEY escalation --to "ENGINEER (owner of OTHER)"

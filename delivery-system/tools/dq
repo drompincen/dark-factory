@@ -26,6 +26,7 @@ trap cleanup EXIT
 
 STATES="Draft Ready Claimed Local-proven Track-proven UAT-proven Live Confirmed Regressed Satisfied Cancelled Decomposed"
 HOLDS="none parked waiting-track waiting-results waiting-approval waiting-answer challenge"
+CLOSED_STATES="Regressed Satisfied Cancelled Decomposed"   # no longer open work; kept as a record
 CARD_SCOPE_KEYS="kind epic remit tier repos services flows depends_on blocks"
 BOARD_FIELDS="kind state hold engineer active_session active_machine heartbeat_at claimed_at remit epic repos services flows depends_on blocks proofs_flag hold_since tier"
 BOARD_HEADER="$(printf 'key\tkind\tstate\thold\tengineer\tsession\tmachine\theartbeat_at\tclaimed_at\tremit\tepic\trepos\tservices\tflows\tdepends_on\tblocks\tflag\thold_since\ttier')"
@@ -35,9 +36,10 @@ usage() {
 dq - delivery queue tool (details: manual/COORDINATE.txt)
 
 Look before you work
-  dq look [--near KEY] [--prefix P] [--all] [--to NAME]
+  dq look [--near KEY] [--prefix P] [--all] [--quiet] [--to NAME]
                                   who holds what, who is near, open questions
   dq whois KEY                    one item's card, and whether you may take it
+  dq show KEY [FILE]              read a file of any item; no FILE lists them
   dq done-check KEY [REPO...]     mechanical checks for "already done?"
   dq overlap KEY REPO [KEY...]    files this item and other items both change
   dq inbox [--to NAME]            open questions addressed to you
@@ -412,6 +414,8 @@ for p in data:
         continue
     if mode == "run":
         cwd = p.get("cwd") or cwd_default
+        if not os.path.isabs(cwd):          # relative to the workspace root, so it works on any machine
+            cwd = os.path.join(cwd_default, cwd)
         started = time.time()
         try:
             done = subprocess.run(["bash", "-c", p.get("command", "false")], cwd=cwd,
@@ -664,9 +668,26 @@ cmd_claim() {
   done
   [ -n "$key" ] || die "usage: dq claim KEY [--kind story|bug|task|spike|epic] [--epic KEY] [--remit NAME] [--reopen]"
   valid_key "$key"; need_queue; need_me; ensure_identity
-  local tip parent dir sess t commit closed=""
+  local tip parent dir sess t commit closed="" st=""
   tip="$(remote_tip "claim/$key")"
-  if [ -n "$tip" ]; then report_taken "$key"; exit 3; fi
+  if [ -n "$tip" ]; then
+    if fetch_branch "claim/$key"; then
+      st="$(Q show "refs/remotes/origin/claim/$key:items/$key/claim.yaml" 2>/dev/null | sed -n 's/^state:[ \t]*//p' | head -n1)"
+    fi
+    case " $CLOSED_STATES " in
+      *" $st "*)
+        echo "CLOSED=$key"
+        echo "STATE=$st"
+        note "$key is closed (state: $st). Read it with: dq show $key bundle/SUMMARY.md"
+        if [ "$reopen" = 1 ]; then
+          note "Its claim branch is still on the server, so it cannot be claimed again from here."
+          note "More work on a closed item is normally a new ticket. Otherwise ask the harness team to archive claim/$key first."
+          exit 5
+        fi
+        exit 3 ;;
+    esac
+    report_taken "$key"; exit 3
+  fi
   fetch_branch "$DEFAULT" || die "cannot fetch $DEFAULT from the queue remote: $(head -n1 "$TMPERR")"
   parent="$(Q rev-parse "refs/remotes/origin/$DEFAULT")"
   if Q cat-file -e "$parent:items/$key/claim.yaml" 2>/dev/null; then
@@ -734,6 +755,7 @@ cmd_whois() {
   stale="$(setting coordination session_stale_minutes 120 DQ_STALE_MINUTES)"
   sess="$(fget_str "$card" active_session)"; eng="$(fget_str "$card" engineer)"
   echo "---"
+  case " $CLOSED_STATES " in *" $(fget_str "$card" state) "*) echo "CLOSED=$key" ;; esac
   echo "HEARTBEAT_AGE_MIN=$age"
   if [ -z "$sess" ]; then
     echo "ACTIVE=no"
@@ -748,6 +770,24 @@ cmd_whois() {
     if [ "$eng" = "$ENGINEER" ]; then echo "CAN_TAKE=only with --replace-mine \"reason\", if that session is truly gone"
     else echo "CAN_TAKE=no (an active session holds it)"; fi
   fi
+}
+
+cmd_show() { # KEY [FILE] : print one file of any item, open or closed; with no FILE, list its files
+  local key="${1:-}" file="${2:-}" tip ref=""
+  valid_key "$key"; need_queue
+  tip="$(remote_tip "claim/$key")"
+  if [ -n "$tip" ] && fetch_branch "claim/$key"; then
+    ref="$tip"
+  else
+    fetch_branch "$DEFAULT" || die "cannot fetch $DEFAULT from the queue remote"
+    if Q cat-file -e "refs/remotes/origin/$DEFAULT:items/$key/claim.yaml" 2>/dev/null; then ref="refs/remotes/origin/$DEFAULT"; fi
+  fi
+  [ -n "$ref" ] || die "there is no item $key in the queue"
+  if [ -z "$file" ]; then
+    Q ls-tree -r --name-only "$ref" -- "items/$key/" | sed "s#^items/$key/##"
+    return 0
+  fi
+  Q show "$ref:items/$key/$file" 2>/dev/null || die "$key has no file '$file'. List its files with: dq show $key"
 }
 
 cmd_take() {
@@ -1073,6 +1113,17 @@ card_row() { # KEY (card text on stdin) -> one board row
       if (i > 1) { k = substr($0, 1, i - 1); v = substr($0, i + 1); sub(/^[ \t]+/, "", v); sub(/[ \t]+$/, "", v); if (!(k in val)) val[k] = v } }
     END { n = split(fields, f, " "); out = key; for (j = 1; j <= n; j++) out = out "\t" val[f[j]]; print out }'
 }
+open_only() { # board rows on stdin -> rows whose state is not closed
+  awk -F'\t' -v closed=" $CLOSED_STATES " 'NF && index(closed, " " $3 " ") == 0'
+}
+of_open_items() { # question rows on stdin, board rows in $1 -> questions of open items
+  KEYS="$(printf '%s\n' "$1" | cut -f1)" awk -F'\t' 'BEGIN { n = split(ENVIRON["KEYS"], a, "\n"); for (i = 1; i <= n; i++) if (a[i] != "") k[a[i]] = 1 } NF && ($1 in k)'
+}
+quiet_rows() { # board rows on stdin -> open claims with no session and no save for claim_quiet_days
+  local cut
+  cut="$(from_epoch $(( $(date -u +%s) - $(setting coordination claim_quiet_days 3 DQ_QUIET_DAYS) * 86400 )))"
+  awk -F'\t' -v cut="$cut" 'NF && $6 == "" && $8 != "" && $8 <= cut'
+}
 claim_rows() { # REFPREFIX
   local ref key
   "${LOOKGIT[@]}" for-each-ref --format='%(refname)' "$1" | while IFS= read -r ref; do
@@ -1112,7 +1163,7 @@ load_rows() { # [PREFIX] : fill ROWS, QROWS, RROWS from the board, else from the
   ROWS=""; QROWS=""; RROWS=""; SRC=""
   tip="$(remote_tip board)"
   if [ -n "$tip" ] && fetch_branch board; then
-    ROWS="$(Q show "refs/remotes/origin/board:BOARD.tsv" 2>/dev/null | sed '1,2d' || true)"
+    ROWS="$(Q show "refs/remotes/origin/board:BOARD.tsv" 2>/dev/null | sed '1,2d' | open_only || true)"
     QROWS="$(Q show "refs/remotes/origin/board:QUESTIONS.tsv" 2>/dev/null | sed '1d' || true)"
     RROWS="$(Q show "refs/remotes/origin/board:REQUESTS.tsv" 2>/dev/null | sed '1d' || true)"
     gen="$(Q show "refs/remotes/origin/board:BOARD.tsv" 2>/dev/null | sed -n '1s/^# generated_at: //p' || true)"
@@ -1138,8 +1189,8 @@ load_rows() { # [PREFIX] : fill ROWS, QROWS, RROWS from the board, else from the
     "+refs/heads/claim/${pfx}*:refs/claims/${pfx}*" "+refs/heads/request/*:refs/requests/*" 2>"$TMPERR" \
     || note "look: fetch problem: $(head -n1 "$TMPERR")"
   LOOKGIT=(git --git-dir "$cache")
-  ROWS="$(claim_rows refs/claims/)"
-  QROWS="$(question_rows refs/claims/)"
+  ROWS="$(claim_rows refs/claims/ | open_only)"
+  QROWS="$(question_rows refs/claims/ | of_open_items "$ROWS")"
   RROWS="$(request_rows refs/requests/)"
   if [ -n "$pfx" ]; then ROWS="$(printf '%s\n' "$ROWS" | awk -F'\t' -v p="$pfx" 'index($1, p) == 1')"; fi
   SRC="claim branches read directly ($n; no board yet)"
@@ -1174,12 +1225,13 @@ near_rows() { # KEY : rows that share scope with KEY, or are linked to it
 }
 
 cmd_look() {
-  local near="" pfx="" all=0 to=""
+  local near="" pfx="" all=0 to="" quiet=0 qr
   while [ $# -gt 0 ]; do
     case "$1" in
       --near) near="$2"; shift 2 ;;
       --prefix) pfx="$2"; shift 2 ;;
       --all) all=1; shift ;;
+      --quiet) quiet=1; shift ;;
       --to) to="$2"; shift 2 ;;
       *) die "look: unknown option $1" ;;
     esac
@@ -1197,6 +1249,8 @@ cmd_look() {
     printf 'ON_HOLD='; printf '%s\n' "$ROWS" | awk -F'\t' 'NF && $4 != "" && $4 != "none" { c[$4]++ } END { for (s in c) printf "%s:%d ", s, c[s]; print "" }'
     printf 'SILENT_SESSIONS='; printf '%s\n' "$ROWS" | awk -F'\t' -v cut="$cut" 'NF && $6 != "" && $8 < cut { n++ } END { print n + 0 }'
     printf 'FLAGGED_PROOFS='; printf '%s\n' "$ROWS" | awk -F'\t' 'NF && $17 != "" { n++ } END { print n + 0 }'
+    qr="$(printf '%s\n' "$ROWS" | quiet_rows)"
+    echo "QUIET_CLAIMS=$(printf '%s\n' "$qr" | awk 'NF' | wc -l | tr -d ' ')"
     if [ -n "$ENGINEER" ]; then
       mine="$(printf '%s\n' "$ROWS" | awk -F'\t' -v e="$ENGINEER" 'NF && $5 == e')"
       if [ -n "$mine" ]; then echo; echo "YOURS ($ENGINEER):"; printf '%s\n' "$mine" | show_rows; fi
@@ -1205,6 +1259,10 @@ cmd_look() {
       nr="$(near_rows "$near")"
       echo; echo "NEAR $near:"
       if [ -n "$nr" ]; then printf '%s\n' "$nr" | show_rows; else echo "(nothing else shares its repos, services, flows or epic)"; fi
+    fi
+    if [ "$quiet" = 1 ]; then
+      echo; echo "QUIET (no active session and no save for $(setting coordination claim_quiet_days 3 DQ_QUIET_DAYS) days or more):"
+      if [ -n "$qr" ]; then printf '%s\n' "$qr" | show_rows; else echo "(none)"; fi
     fi
     if [ "$all" = 1 ]; then echo; echo "ALL:"; printf '%s\n' "$ROWS" | show_rows; fi
   fi
@@ -1228,7 +1286,7 @@ cmd_inbox() {
   q="$(printf '%s\n' "$QROWS" | awk -F'\t' -v w="$who" 'NF && (w == "" || index(tolower($3), tolower(w)) > 0)')"
   if [ -z "$q" ]; then echo "INBOX=empty"; return 0; fi
   { printf 'KEY\tFILE\tTO\tBLOCKING\tASKED_BY\tASKED\n'; printf '%s\n' "$q"; } | fmt_table
-  note "Read a question with:  git -C \"$QUEUE\" fetch origin claim/KEY && git -C \"$QUEUE\" show FETCH_HEAD:items/KEY/escalations/FILE"
+  note "Read a question with:  dq show KEY escalations/FILE"
 }
 
 cmd_done_check() {
@@ -1239,7 +1297,10 @@ cmd_done_check() {
   tip="$(remote_tip "claim/$key")"
   if [ -n "$tip" ] && fetch_branch "claim/$key"; then
     st="$(Q show "$tip:items/$key/claim.yaml" 2>/dev/null | sed -n 's/^state:[ \t]*//p' | head -n1)"
-    echo "open claim: yes (state $st). Someone already holds it: dq whois $key"
+    case " $CLOSED_STATES " in
+      *" $st "*) echo "open claim: no (closed, state $st). Read it: dq show $key bundle/SUMMARY.md" ;;
+      *) echo "open claim: yes (state $st). Someone already holds it: dq whois $key" ;;
+    esac
     found=$(( found + 1 ))
   else
     echo "open claim: no"
@@ -1633,8 +1694,8 @@ cmd_board() {
     '+refs/heads/request/*:refs/remotes/origin/request/*' 2>"$TMPERR" || die "cannot fetch claims: $(head -n1 "$TMPERR")"
   LOOKGIT=(git -C "$QUEUE")
   d="$(mktemp -d)"
-  { printf '# generated_at: %s\n' "$(now)"; printf '%s\n' "$BOARD_HEADER"; claim_rows refs/remotes/origin/claim/ | sort; } > "$d/BOARD.tsv"
-  { printf 'key\tfile\tto\tblocking\tasked_by\tasked\n'; question_rows refs/remotes/origin/claim/; } > "$d/QUESTIONS.tsv"
+  { printf '# generated_at: %s\n' "$(now)"; printf '%s\n' "$BOARD_HEADER"; claim_rows refs/remotes/origin/claim/ | open_only | sort; } > "$d/BOARD.tsv"
+  { printf 'key\tfile\tto\tblocking\tasked_by\tasked\n'; question_rows refs/remotes/origin/claim/ | of_open_items "$(sed '1,2d' "$d/BOARD.tsv")"; } > "$d/QUESTIONS.tsv"
   { printf 'request\tstatus\tfrom\tdate\ttitle\n'; request_rows refs/remotes/origin/request/; } > "$d/REQUESTS.tsv"
   { printf 'track\tholder\tengineer\tsession\texpires_at\n'
     for t in $(lease_tracks); do lease_read "$t"; printf '%s\t%s\t%s\t%s\t%s\n' "$t" "${L_HOLDER:-none}" "$L_ENGINEER" "$L_SESSION" "$L_EXPIRES"; done
@@ -1644,6 +1705,10 @@ cmd_board() {
     echo "| Item | State | Hold | Engineer | Active session | Last heartbeat | Repos | Flows | Flag |"
     echo "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"
     sed '1,2d' "$d/BOARD.tsv" | awk -F'\t' 'NF { printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n", $1, $3, $4, $5, $6, $8, $12, $14, $17 }'
+    echo; echo "## Quiet claims"; echo
+    echo "No active session and no save for $(setting coordination claim_quiet_days 3 DQ_QUIET_DAYS) days or more. The remit lead decides who takes each one over."; echo
+    echo "| Item | State | Hold | Engineer | Last heartbeat | Remit |"; echo "| --- | --- | --- | --- | --- | --- |"
+    sed '1,2d' "$d/BOARD.tsv" | quiet_rows | awk -F'\t' 'NF { printf "| %s | %s | %s | %s | %s | %s |\n", $1, $3, $4, $5, $8, $10 }'
     echo; echo "## Open questions"; echo
     echo "| Item | File | To | Blocking | Asked by | Asked |"; echo "| --- | --- | --- | --- | --- | --- |"
     sed '1d' "$d/QUESTIONS.tsv" | awk -F'\t' 'NF { printf "| %s | %s | %s | %s | %s | %s |\n", $1, $2, $3, $4, $5, $6 }'
@@ -1779,12 +1844,12 @@ sys.stdout.write("%s\0%s\0%s\0" % (data.get("tool_name", ""), tool_input.get("co
       if ! printf '%s' "$seg" | grep -Eq '(^|[^[:alnum:]_/.-])git([[:space:]]|$)'; then continue; fi
       if ! printf '%s' "$seg" | grep -Eq '[[:space:]]push([[:space:]]|$)'; then continue; fi
       if printf '%s' "$seg" | grep -Eq '[[:space:]](--force|--force-with-lease|--force-if-includes|-f|--mirror|--delete|-d)([[:space:]=]|$)'; then
-        hook_block "a push that forces or deletes is never allowed (rule 7). If the remote moved, merge it in and push again."
+        hook_block "a push that forces or deletes is never allowed (rule 10). If the remote moved, merge it in and push again."
       fi
-      if printf '%s' "$seg" | grep -Eq '[[:space:]]\+[^[:space:]]'; then hook_block "a refspec starting with + is a force-push (rule 7)."; fi
-      if printf '%s' "$seg" | grep -Eq '[[:space:]]:[^[:space:]]'; then hook_block "a refspec starting with : deletes a remote branch (rule 7)."; fi
+      if printf '%s' "$seg" | grep -Eq '[[:space:]]\+[^[:space:]]'; then hook_block "a refspec starting with + is a force-push (rule 10)."; fi
+      if printf '%s' "$seg" | grep -Eq '[[:space:]]:[^[:space:]]'; then hook_block "a refspec starting with : deletes a remote branch (rule 10)."; fi
       if printf '%s' "$seg" | grep -Eq "[[:space:]]([^[:space:]]*:)?(refs/heads/)?($defaults)([[:space:]]|\$)"; then
-        hook_block "that pushes to a default branch (rule 7). Push your item/KEY branch and open a merge request."
+        hook_block "that pushes to a default branch (rule 10). Push your item/KEY branch and open a merge request."
       fi
     done < <(printf '%s\n' "$cmd" | sed -E 's/(&&|\|\||;|\|)/\n/g')
   fi
@@ -1792,7 +1857,7 @@ sys.stdout.write("%s\0%s\0%s\0" % (data.get("tool_name", ""), tool_input.get("co
     for pat in "$SYSTEM_DIR/*" "*/.gitlab-ci.yml" "*/.github/workflows/*" "*/Jenkinsfile" \
                $(csv_norm "$(setting guardrails protected_paths "" DQ_PROTECTED_PATHS)"); do
       # shellcheck disable=SC2254
-      case "$path" in $pat) hook_ask "Protected path (rule 8): $path. Changing it needs the engineer's approval." ;; esac
+      case "$path" in $pat) hook_ask "Protected path (rule 11): $path. Changing it needs the engineer's approval." ;; esac
     done
   fi
   exit 0
@@ -1830,7 +1895,7 @@ cmd_hook_stop() {
     done
   done
   if [ -z "$problems" ]; then exit 0; fi
-  printf 'Before you stop, finish these (delivery rules 3 and 10):%s\n' "$problems" >&2
+  printf 'Before you stop, finish these (delivery rules 4 and 7):%s\n' "$problems" >&2
   exit 2
 }
 
@@ -1844,6 +1909,7 @@ main() {
   case "$cmd" in
     look) cmd_look "$@" ;;
     whois) cmd_whois "$@" ;;
+    show) cmd_show "$@" ;;
     done-check) cmd_done_check "$@" ;;
     overlap) cmd_overlap "$@" ;;
     inbox) cmd_inbox "$@" ;;
