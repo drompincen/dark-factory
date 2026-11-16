@@ -24,8 +24,10 @@ queue repo by every "dq beat". It holds small text only.
   contract.yaml             dq new KEY contract     The definition of done.
   proofs.json               dq new KEY proofs       One entry per proof.
                                                     Frozen by "dq freeze".
-  challenge.md              dq new KEY challenge    An objection to the ask,
-                                                    for product to answer.
+  escalations/              dq new KEY challenge    An objection to the ask,
+    KEY-challenge.md                                for product to answer.
+                                                    Listed with the open
+                                                    questions.
   escalations/KEY-n.md      dq new KEY escalation   One question to one
                               --to "WHO"            person. They write under
                                                     "Answer:".

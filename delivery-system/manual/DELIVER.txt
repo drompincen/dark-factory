@@ -177,8 +177,9 @@ Then:
   challenge and do not build until product answers.
       dq new KEY challenge
       dq beat KEY -s SESSION --hold challenge --reason "..."
-  Tell the engineer. Product writes the answer into the file. You may go
-  on reading and drafting meanwhile, not implementing.
+  Tell the engineer. The challenge is listed on the board with the open
+  questions, and product writes the answer into the file. You may go on
+  reading and drafting meanwhile, not implementing.
 - Check 2 or 4 raises a concern: write the challenge the same way and
   tell the engineer. Continue only on the engineer's explicit go-ahead,
   recorded in the journal. Product still answers.

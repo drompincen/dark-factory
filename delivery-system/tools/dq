@@ -973,7 +973,7 @@ cmd_new() {
   case "$kind" in
     contract)      tpl="contract.yaml";      dest="contract.yaml" ;;
     proofs)        tpl="proofs.json";        dest="proofs.json" ;;
-    challenge)     tpl="challenge.md";       dest="challenge.md" ;;
+    challenge)     tpl="challenge.md";       dest="escalations/$key-challenge.md" ;;   # so it shows as an open question
     summary)       tpl="SUMMARY.md";         dest="bundle/SUMMARY.md" ;;
     jira)          tpl="jira-update.md";     dest="jira-update.md"; force=1 ;;
     decomposition) tpl="decomposition.yaml"; dest="decomposition.yaml" ;;

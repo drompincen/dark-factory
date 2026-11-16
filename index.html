@@ -386,8 +386,18 @@
   #exportBtn:hover { background: var(--surface2); color: var(--text); }
   #exportBtn svg { width: 15px; height: 15px; }
 
+  /* ── LINK TO THE DELIVERY SYSTEM FILES ── */
+  #systemLink {
+    position: fixed; top: 16px; right: 160px; z-index: 100;
+    padding: 8px 14px; border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px; background: var(--surface); color: var(--text-dim);
+    font-size: 13px; font-weight: 600; line-height: 15px;
+    text-decoration: none; transition: all 0.25s;
+  }
+  #systemLink:hover { background: var(--surface2); color: var(--text); }
+
   @media print {
-    #progress-bar, #nav, #dots, .key-hint, #exportBtn { display: none !important; }
+    #progress-bar, #nav, #dots, .key-hint, #exportBtn, #systemLink { display: none !important; }
     html, body { overflow: visible !important; height: auto !important; }
     #wizard { height: auto !important; }
     .slide {
@@ -439,6 +449,9 @@
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
   Export PDF
 </button>
+
+<!-- Link to the delivery system: spec, agent manual and tool -->
+<a id="systemLink" href="delivery-system/" title="The proof-driven delivery system: spec, agent manual and tool">Delivery system</a>
 
 <!-- Progress Bar -->
 <div id="progress-bar"><div id="progress-fill" style="width: 0%"></div></div>

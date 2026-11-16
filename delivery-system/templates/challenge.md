@@ -27,4 +27,4 @@ One of: go ahead as written, go ahead with the change proposed, replace it,
 or withdraw it. If the outcome link is missing, the line it should move.
 
 Answer:
-(product writes here and commits; nothing is built until this is answered)
+(product writes here and commits)

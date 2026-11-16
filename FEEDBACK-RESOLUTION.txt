@@ -1,0 +1,278 @@
+FEEDBACK RESOLUTION
+===================
+2026-11-15. Answers FEEDBACK.txt, point by point, for version 0.3.
+
+Every point in the review was acted on. Each line below gives the point
+and where the fix is. Paths are under delivery-system/ unless they start
+with a slash.
+
+  CORE        DELIVERY-AGENT.txt (the part every session reads)
+  DELIVER     manual/DELIVER.txt
+  COORD       manual/COORDINATE.txt
+  SETUP       manual/SETUP.txt
+  CONCEPTS    manual/CONCEPTS.txt
+  SPEC        proof-driven-delivery-system.txt
+  ENV         environment.example.yaml
+  dq          tools/dq, the coordination tool (new)
+
+Read "What I assumed" and "What only your environment can settle" at the
+end before relying on this.
+
+
+PART A
+------
+
+A1. Start a session and it asks for the Jira epic or story
+
+  Epics have no path            DELIVER "Epic path". "dq claim EPIC --kind
+                                epic", a decomposition file, one drafted
+                                contract per story, proposed stories for
+                                product, state Decomposed.
+  Config reads one ticket only  ENV and the local config gain
+                                jira.children_command and
+                                jira.search_command. SETUP asks for them
+                                and tests jira_children.
+  Ticket type never checked     DELIVER step 0 branches on epic, story,
+                                task, bug, spike, sub-task. "Spike path".
+  Bootstrap needs the human to  "dq install" writes a short block into the
+  type an instruction           workspace's CLAUDE.md before the first
+                                session, plus three skills. Every start
+                                runs the start routine and asks for the
+                                epic or story if none was named.
+  Setup repeated per workspace  SETUP step 1 reads the shared environment
+                                file and other engineers' published
+                                configs first, then asks only what is left.
+
+A2. Find the Atlas project and llm-wiki
+
+  llm-wiki not mentioned        Defined as the format Atlas is written in:
+                                CONCEPTS, SPEC section 4 "Format", ENV
+                                atlas.format and knowledge.llm_wiki.
+                                See "What I assumed".
+  Principle 6 conflict          SPEC principle 6 now reads "the only source
+                                that binds". CORE section 2 and ENV
+                                knowledge.llm_wiki_binding say any other
+                                source is context, and Atlas wins.
+  Ticket to Atlas mapping       ENV atlas.project_map. DELIVER step 0,
+                                "Pick the remit". SPEC section 4.
+  Finding Atlas when it is not  ENV holds the remotes for Atlas, the queue,
+  cloned                        the system repo and the code repos. SETUP
+                                step 2 clones from them.
+  Catalogs have no slots        ENV atlas.service_catalog, faker_catalog,
+                                spotlight_catalog, proof_catalog, glossary,
+                                flow_map. DELIVER step 3 reads them.
+  Freshness                     CORE section 2: status and age decide
+                                whether a page may be relied on. Contracts
+                                list each page with its status and date.
+                                ENV atlas.stale_after_days. SPEC section 4.
+
+A3. Understand tracks, spotlights and remits
+
+  Agent never told to read the  CORE lists it. CONCEPTS ends with a map
+  spec                          from each idea to its spec section.
+  No glossary                   CONCEPTS.
+  Remit fixed per engineer      DELIVER step 0 takes the remit from the
+                                ticket, handles another engineer's remit
+                                and tickets that cross remits. The contract
+                                gains other_remits.
+  Choosing a spotlight          DELIVER step 3, "Pick the spotlight",
+                                including what to do when none fits.
+  lease_method unknown          DELIVER step 14a and COORD section 8 cover
+                                branch, assigned and unknown.
+
+A4. Document and evidence changes
+
+  No proof per rung             Contract proofs_by_rung; every proof has a
+                                rung; "dq check-proofs --rung".
+  No stop_conditions field      Contract stop_conditions.
+  Success criteria wording      DELIVER step 6, with three worked examples.
+                                Criteria are observed / condition / how.
+  UI and CLI evidence, large    DELIVER step 11, "Evidence, by kind of
+  binaries                      flow". "dq evidence" stores large files on
+                                evidence/KEY or a shared directory, never
+                                on the claim. ENV evidence.max_file_kb.
+                                LFS is off unless you turn it on.
+  Rule 3 depends on a hook      It no longer does. "dq state" refuses a
+                                move whose evidence is missing and re-runs
+                                the local proofs. The hook now exists too,
+                                installed by "dq install".
+  Jira gets none of this        Each item keeps jira-update.md, rewritten
+                                at every state change and required for
+                                Track-proven. ENV jira.mirror says who
+                                posts it. See "What only your environment
+                                can settle".
+  Holdout scenarios             CORE rule 16, DELIVER steps 15 and 19, the
+                                summary template, CONCEPTS, SPEC section 5.
+
+A5. Deliver in a closed loop
+
+  Waiting for track results     COORD sections 8 and 9: look every 5
+                                minutes, park after 30, stop condition at
+                                120, and what may be done meanwhile. All
+                                three numbers are in ENV.
+  Permissions for unattended    SETUP step 7. "dq install" writes hooks and
+  runs                          rules. SPEC section 10, "Unattended runs".
+  Budgets in hours              The card counts worked seconds from the
+                                claim through the heartbeats; dq reports
+                                when hours or iterations are spent.
+                                Journal lines carry timestamps.
+  Context exhaustion            DELIVER step 11 "Checkpoint", COORD
+                                section 12.
+  Rebasing                      DELIVER step 13, "Catch up and re-prove".
+                                It merges; see "Where I departed".
+
+A6. Others know the work was picked up, and by whom
+
+  Claim comes too late          CORE rule 1. DELIVER step 1. The claim is
+                                the first write, in state Draft.
+  "By whom" is only the         The card names engineer, machine, session
+  engineer                      id, claim time, active-since and heartbeat.
+  No heartbeat                  "dq beat" and "dq push"; CORE rule 7. A
+                                session silent for 120 minutes can be
+                                replaced.
+  Branch protection unchecked   "dq protect-check", run in SETUP step 6.
+  Epic-level claims             "dq claim EPIC --kind epic".
+  No board                      "dq board --publish" builds it; BOARD.md is
+                                the page for people. "dq look" reads it.
+
+A7. Share work across machines and resume elsewhere
+
+  No push rule                  CORE rule 7. A hook refuses to end a turn
+                                with unsaved item files or unpushed
+                                commits.
+  No transfer step              COORD section 4: handover with "dq take
+                                --from", recorded on the card. Quiet claims
+                                are listed for the remit lead.
+  Two machines resume at once   The active-session marker, taken with "dq
+                                take" and given up with "dq release". A
+                                replaced session is stopped at its next
+                                save.
+  Local state not portable      The journal's "Rebuild local state"
+                                section; "dq publish-config"; COORD
+                                section 5.
+  Exploration lives in context  The journal, with its dead ends, is pushed
+                                by every beat.
+
+A8. Is the work already done?
+
+  No pre-check                  DELIVER step 2 and "dq done-check": the
+                                queue, every repo's history and branches,
+                                Atlas, then Jira and the running product.
+  Near-duplicates               DELIVER step 2, and outcome c.
+  No outcome for already done   State Satisfied, with its own small bundle.
+                                Cancelled for a withdrawn duplicate.
+
+A9. Challenge the ask
+
+  Only conflict is checked      DELIVER step 5: four checks.
+  No empty-outcome rule         Step 5, check 1.
+  No challenge format           templates/challenge.md, a challenge block
+                                in the contract, a "challenge" hold, and
+                                product answers in the file.
+  Mark to market, target state  Step 5, checks 2 and 3.
+
+A10. Orient among the other sessions
+
+  No look outward               CORE section 4, step 4. "dq look". COORD
+                                section 6.
+  Overlap detection             "dq overlap", "dq look --near", DELIVER
+                                step 13, COORD section 7.
+  Dependencies                  depends_on and blocks, on the card and in
+                                the contract.
+  Track queue visibility        "dq lease list": holders, expiry, and who
+                                is waiting.
+  Scale                         One board branch. Without it, dq counts
+                                claims first and reads only their tips,
+                                and refuses above 200.
+  Orientation summary           CORE section 4, step 7.
+
+A11. Find out how
+
+  Search before asking          CORE section 5.
+  Shared environment knowledge  environment.yaml, read first; SETUP step 9
+                                proposes additions.
+  Missing capabilities          "dq request", shown on the board.
+  Manual versioning             VERSION, CHANGELOG.txt, "dq version
+                                --check" at every start.
+  Size                          The core is 220 lines. The rest is read on
+                                demand.
+
+
+PART B
+------
+
+  B1   Six principles, eight   SPEC section 1 says eight.
+       listed
+  B2   Approval before the     The engineer approves the contract (DELIVER
+       proofs exist            step 8). For tiers 2 and 3 the remit lead
+                               approves once the proofs are written (step
+                               10). SPEC section 5.
+  B3   Rule 4 wording          CORE rule 5: fix or drop before the freeze;
+                               only "passes" after it. "dq freeze".
+  B4   Who approves proofs     The remit lead, in SPEC sections 5 and 10.
+  B5   After parking           SPEC section 6: the session releases the
+                               item and ends.
+  B6   Remit page in the       SPEC section 4 lists remit pages, fourth.
+       order
+  B7   Stop conditions         One list, the same in SPEC section 10 and
+                               CORE section 6.
+  B8   6 to 12 sessions        SPEC sections 1, 6 and 8: a cap a remit
+                               earns, starting from one.
+  B9   "If the config          ENV queue.close_method. DELIVER step 19.
+       allows it"
+  B10  Iterations budget       ENV budgets.iterations_per_item and the
+                               contract. Counted from journal attempts.
+  B11  Not linked from the     /README.md, a link in /index.html beside
+       site                    Export PDF, and delivery-system/index.html.
+                               Live on the site once merged to main.
+  B12  Two unchecked links     Both are right. SPEC section 14 records the
+                               date and adds three sources.
+
+
+WHERE I DEPARTED FROM THE SUGGESTIONS
+-------------------------------------
+
+- Merge, not rebase, before rung 2. The item branch is already pushed, and
+  no session rewrites pushed history.
+- The config key is jira.children_command, not list_children_command.
+- The board is its own branch, "board", not a file on the default branch,
+  so the job never pushes to a protected default branch.
+- A track lease is never deleted. The earlier spec said "delete it to
+  release", which a protected branch does not allow. The lease branch is
+  updated in place.
+
+
+WHAT I ADDED THAT THE REVIEW DID NOT ASK FOR
+--------------------------------------------
+
+- The coordination protocol as a tool, dq, with a self-test of 254 checks
+  against simulated machines. Prose would have been read several hundred
+  slightly different ways.
+- One spotlight lock per workspace and one worktree per item, because
+  several sessions share a machine.
+- Frozen proofs: a change after the freeze puts a flag on the board.
+- Closed items leave the board. Quiet claims are listed on it.
+- Heartbeat pushes must not start pipelines.
+
+
+WHAT I ASSUMED
+--------------
+
+- llm-wiki is the format of Atlas, not a second source. You described
+  Atlas as "llm wiki style". If you also run a separate wiki, set
+  knowledge.llm_wiki in environment.yaml; it is then treated as context.
+
+
+WHAT ONLY YOUR ENVIRONMENT CAN SETTLE
+-------------------------------------
+
+Nothing here has run against your GitLab, Jira, tracks or Claude Code
+version. delivery-system/README.txt has the checklist. The parts that
+decide whether it works:
+
+- Branch protection on the queue repo. "dq protect-check" tests it.
+- The board job, and archiving closed claims.
+- Who posts the Jira comments.
+- What triggers a track deploy and where the results come back.
+- The hook and permission settings, against the Claude Code version you
+  run.

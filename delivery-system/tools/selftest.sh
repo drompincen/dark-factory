@@ -539,7 +539,10 @@ run dq_m m1 path PAY-8;             want_out "path prints the item directory" '/
 for k in challenge summary jira decomposition handoff; do
   run dq_m m1 new PAY-8 "$k";       want_rc "template: $k" 0
 done
-want_grep "templates are filled with the key" "$D8/challenge.md" 'Challenge to PAY-8'
+want_grep "templates are filled with the key" "$D8/escalations/PAY-8-challenge.md" 'Challenge to PAY-8'
+run dq_m m1 beat PAY-8 -s "$S8"
+run dq_m m1 board --publish
+run dq_m m3 inbox --to product;     want_out "a challenge shows up as an open question for product" 'PAY-8-challenge.md'
 run dq_m m1 new PAY-8 escalation --to "omar (owner of PAY-4)"
 want_grep "an escalation can be addressed to another item's owner" "$D8/escalations/PAY-8-1.md" '^To: omar \(owner of PAY-4\)$'
 run dq_m m1 state PAY-8 -s "$S8" Satisfied; want_rc "Satisfied needs its summary and Jira update" 0
@@ -552,6 +555,7 @@ run dq_m m3 claim PAY-8;            want_rc "an item in a closed state is not cl
 want_out "the refusal says it is closed, and how" '^CLOSED=PAY-8$'
 want_out "the refusal gives the closed state" '^STATE=Cancelled$'
 run dq_m m3 claim PAY-8 --reopen;   want_rc "reopening waits until the claim is archived" 5
+run dq_m m1 board --publish          # the board job runs again after the item closed
 run dq_m m1 look --prefix PAY-8;    want_out "closed items leave the open count" '^OPEN_CLAIMS=0$'
 run dq_m m3 done-check PAY-8;       want_out "done-check says the claim is closed" 'open claim: no \(closed, state Cancelled\)'
 run dq_m m3 whois PAY-8;            want_out "whois marks a closed item" '^CLOSED=PAY-8$'

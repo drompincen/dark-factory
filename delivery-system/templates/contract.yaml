@@ -30,7 +30,7 @@ challenge:
   in_current_objectives:  # yes | no, and which mark-to-market week you checked
   extends_legacy_flow:    # no | yes, and which flow
   smaller_change:         # none found | the smaller change that would do
-  result:                 # passed | raised (see challenge.md) | product said go
+  result:                 # passed | raised (see the challenge file) | product said go
 success_criteria:
   # One entry per criterion. Each names what is observed, the exact
   # condition, and how it is observed. See DELIVER.txt, step 6.

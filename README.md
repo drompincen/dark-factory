@@ -22,6 +22,22 @@ An interactive presentation on AI-driven software engineering maturity, based on
 - **Digital twins**: Simulated external services enabling full integration testing without touching real APIs or data.
 - **Enterprise tiering**: Not every system should target Level 5 — a portfolio approach by risk class is recommended.
 
+## Delivery system
+
+A working design for running delivery this way with a real team: several hundred Claude Code sessions that take Jira tickets and prove them up a ladder (local spotlight, test track, UAT, prod, regression), coordinated only through git.
+
+**[Browse the delivery system](https://drompincen.github.io/dark-factory/delivery-system/)** once this is on `main`, or read the files here:
+
+| File | What it is |
+|------|------------|
+| [`delivery-system/README.txt`](delivery-system/README.txt) | What is in the directory, and the one-time checklist for the harness team |
+| [`delivery-system/DELIVERY-AGENT.txt`](delivery-system/DELIVERY-AGENT.txt) | The core manual every session reads at the start |
+| [`delivery-system/manual/`](delivery-system/manual/) | The parts read when needed: concepts, setup, deliver, coordinate, templates |
+| [`delivery-system/proof-driven-delivery-system.txt`](delivery-system/proof-driven-delivery-system.txt) | The spec: why the system is shaped this way |
+| [`delivery-system/tools/dq`](delivery-system/tools/dq) | The coordination tool, with [`selftest.sh`](delivery-system/tools/selftest.sh) |
+| [`FEEDBACK.txt`](FEEDBACK.txt) | A review of version 0.2 at 300 to 600 sessions |
+| [`FEEDBACK-RESOLUTION.txt`](FEEDBACK-RESOLUTION.txt) | Each point of that review, and where it was fixed |
+
 ## Deployment
 
 The presentation is deployed automatically to GitHub Pages on every push to `main` via GitHub Actions (`.github/workflows/pages.yml`).
