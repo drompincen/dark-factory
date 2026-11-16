@@ -286,7 +286,8 @@ After you trigger a deploy, the result arrives at tracks.results_path.
 - After tracks.park_after_minutes (30) with no result, stop waiting in
   the session. Write the run's start time, track and commits under
   "Resume from", then:
-      dq release KEY -s SESSION --hold waiting-results --reason "run started HH:MM on TRACK"
+      dq release KEY -s SESSION --hold waiting-results \
+          --reason "run started HH:MM on TRACK"
   Any later session takes the item, finds the results and carries on from
   step 14d of DELIVER.txt.
 - No result after tracks.result_timeout_minutes (120) from the start of

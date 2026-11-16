@@ -1,6 +1,10 @@
 PROOF-DRIVEN DELIVERY SYSTEM
 ============================
-As of 2026-11-14
+As of 2026-11-15
+
+This is the design and the reasoning. The manual that sessions follow is
+DELIVERY-AGENT.txt, in the same directory, with its parts under manual/ and
+the coordination tool at tools/dq.
 
 
 1. THESIS
@@ -15,22 +19,23 @@ the narrowest of four things:
 
 - Intent clarity. An agent can only close a loop against a definition of
   good that a machine can check.
-- Proof capacity. Ten test tracks serve 300 to 600 agent sessions: 50
-  engineers with 6 to 12 each. That ratio is the hard cap today.
+- Proof capacity. Ten test tracks serve up to 300 to 600 agent sessions:
+  50 engineers with as many as 6 to 12 each, once their remit has earned
+  that many. That ratio is the hard cap today.
 - Human judgment. 62 people decide what matters, approve what ships, and
   answer what agents cannot.
 - Integration risk. Twenty repos changing in parallel collide unless changes
   are small, flagged and proven together.
 
-Six principles follow from that:
+Eight principles follow from that:
 
 1. Every work item carries its own proof. No proof definition, no start.
 2. Items advance on evidence, not on status updates or assertion.
 3. Humans own intent and judgment. Agents own the execution loop.
 4. Prove in the cheapest environment that can falsify the change.
 5. Every shipped feature leaves behind the regression that guards it.
-6. Atlas is the only source of truth. What is not in Atlas, agents do not
-   know.
+6. Atlas is the only source that binds. Everything else is context, and
+   where another source disagrees with Atlas, Atlas wins.
 7. Earn trust before adding sessions. One agent that can prove its work
    comes before twelve that cannot.
 8. A correction made twice becomes a check. Rules live in lint, tests, hooks
@@ -91,25 +96,70 @@ file in a git queue repo, named by its Jira key, so any session can parse it.
 
 Fields:
 
-  Outcome link     The Atlas objective or North Star line this item moves
-  Intent           The user-visible or business result, in two or three
-                   sentences
-  Scope            Repos and services in play, and what is explicitly out
-                   of bounds
-  Proof scenarios  Given / when / then cases, with the faker responses each
-                   one needs staged
-  Proof per rung   The executable check that must pass at local, test
-                   track, UAT and prod
-  Prod signal      The metric or log signal that confirms it works live,
-                   with a watch window
-  Constraints      Links to the Atlas principles, decisions and flows that
-                   bind this work
-  Autonomy tier    0 to 3, set by rule (see Guardrails)
-  Budget           Maximum agent hours, iterations and track hours before
-                   it must stop
-  Stop conditions  What forces the agent to park and ask
-  Regression plan  Which scenarios become permanent tests, and at which rung
-  Owners           One named engineer and one named product person
+  Outcome link      The Atlas objective or North Star line this item moves
+  Intent            The user-visible or business result, in two or three
+                    sentences
+  Scope             Repos, services and flows in play, and what is
+                    explicitly out of bounds
+  Remit             The remit whose lead approves, and any other remits
+                    whose flows the item touches
+  Depends on,       Other items that must land first, and items that wait
+  blocks            on this one
+  Challenge         Whether the ask moves the North Star, fits current
+                    objectives, extends a legacy flow, or could be smaller
+  Success criteria  For each: what is observed, the exact condition, and
+                    how it is observed
+  Proof scenarios   Given / when / then cases, with the faker responses
+                    each one needs staged
+  Proofs by rung    Which scenarios are proven at local, test track, UAT
+                    and prod
+  Prod signal       The metric or log signal that confirms it works live,
+                    with a watch window
+  Constraints       The Atlas pages that bind this work, each with its
+                    status and date
+  Spotlight         The spotlight that proves it locally, or "none fits"
+  Autonomy tier     0 to 3, set by rule (see Guardrails)
+  Budget            Maximum agent hours, iterations and track runs before
+                    it must stop
+  Stop conditions   What forces the agent to park and ask, beyond the
+                    standard list
+  Regression plan   Which scenarios become permanent tests, and at which
+                    rung
+  Owners            One named engineer and one named product person
+
+Intake
+
+A session starts from a Jira key and branches on the issue type.
+
+  Epic      Not delivered; decomposed. One session claims the epic, maps
+            its acceptance onto stories, drafts a contract for each, and
+            writes proposed stories for acceptance that no story covers.
+            Product creates those in Jira.
+  Story,    Delivered through the ladder.
+  task
+  Bug       Delivered. Its first proof reproduces the bug.
+  Spike     A discovery item. Its output is an Atlas decision or a set of
+            contracts, not code.
+  Sub-task  Part of its parent story, and delivered with it.
+
+The ticket's Jira project and component select the remit, through a project
+map in Atlas. A ticket outside the engineer's own remit follows that
+remit's page and lead. A ticket that crosses remits has one primary remit,
+the one whose outcome it moves.
+
+Three checks come before any contract is drafted:
+
+- Claim. The session claims the key first, so that no second session
+  spends time on the same ticket.
+- Already done? Jira status and links, open and closed items in the queue,
+  git history, Atlas, and the running product. "Already satisfied", with
+  the evidence, is a valid outcome and the cheapest one.
+- Challenge. Does the ask move the North Star? Does it fit this period's
+  objectives in the mark to market? Does it extend a legacy flow? Would a
+  smaller change do? A failed check goes to product as a written
+  challenge, and product answers it before anything is built. An outcome
+  link that cannot be filled honestly is a failed check, not a blank to
+  fill loosely.
 
 Ready means falsifiable
 
@@ -127,22 +177,57 @@ is an Atlas decision or a set of contracts, not code.
 States
 
 Draft, Ready, Claimed, Local-proven, Track-proven, UAT-proven, Live,
-Confirmed, Regressed. An item only closes at Regressed. Each transition
-requires its evidence attached, and a pipeline check on the queue repo
-should refuse the move without it.
+Confirmed, Regressed.
+
+- Draft is an item a session has claimed whose contract is not yet agreed.
+- Ready is a contract people prepared ahead that nobody has claimed.
+- Claimed means the contract is agreed and the proofs are frozen.
+
+A delivered item closes at Regressed. Three other endings exist: Satisfied
+(the work was already done, or a spike was answered), Cancelled, and
+Decomposed (an epic split into stories).
+
+Each transition requires its evidence. The session's tool refuses the move
+without it, and a pipeline check on the queue repo should refuse it too.
+
+An item can also be on hold without changing state: parked, waiting for a
+track, waiting for results, waiting for an approval or an answer, or under
+challenge.
 
 Who writes contracts
 
 Sessions draft contracts from the Jira issue plus Atlas. Product and the
-owning engineer correct and approve them. This keeps 12 product people from
-becoming the first bottleneck.
+owning engineer correct them, and the engineer approves each one. For tiers
+2 and 3 the remit lead also approves, once the proofs are written (section
+5). This keeps 12 product people from becoming the first bottleneck.
+
+Vague acceptance is turned into criteria that can be measured: a response,
+a stored record, an emitted event, a screen element, an exit code, a number
+with a threshold and a window. A threshold the ticket does not give is
+proposed, marked as proposed, and confirmed by product or the remit lead.
+It is never invented silently.
 
 
 4. ATLAS
 --------
 
 Atlas already holds the right material. What it needs to drive agents is
-authority, structure and a write-back loop.
+a known format, authority, structure and a write-back loop.
+
+Format
+
+Atlas is written as an llm-wiki: a wiki kept for, and largely by, agent
+sessions. Four things make it one:
+
+- An index page, read first, that links to everything else.
+- Pages that link to one another, each with front matter.
+- An append-only log of what changed and when, so a session can catch up
+  from where it last read.
+- A schema page that says how the wiki is organised and how to add to it.
+
+"llm-wiki" names this format; it is not a second source. If a separate wiki
+exists under that name, it is context only, like every other source outside
+Atlas, unless an Atlas decision says otherwise.
 
 Authority
 
@@ -153,12 +238,27 @@ and what it supersedes. Then set a precedence order:
 1. North Star
 2. Principles
 3. Decisions, newest wins, superseded ones marked
-4. Agreed flows
-5. Target state
+4. Remit pages
+5. Agreed flows
+6. Target state
+
+Reference pages describe the system and do not bind: the flow map, the
+catalogs and the glossary. A session trusts them when they are fresh and
+checks them against the running product when they are not.
 
 Ideas, minutes and legacy flows are context and never binding. A decision
 made in a meeting counts only once it is promoted from the minutes to a
-decision record.
+decision record. Every source outside Atlas is context too: a separate
+wiki, ticket comments, chat. Where one disagrees with Atlas, Atlas wins and
+the session reports the disagreement.
+
+Freshness
+
+A binding page binds only while its status is "agreed". A page with no
+status, or older than a set age (90 days to start), is unverified: the
+session checks it against the product or asks its owner before relying on
+it, and says so in its report. Each contract lists the pages it relied on,
+with their status and date.
 
 Pages to add
 
@@ -175,14 +275,20 @@ Pages to add
   exemplar contracts and bundles, session cap.
 - Flow map. For each flow: how to reach it in a spotlight, how to drive it,
   its flags and data, known traps.
+- Project map. Which Jira project and component belongs to which remit,
+  flows and repos. It is how a session given any ticket finds the right
+  context.
 
 Mark every flow as legacy, transitional or target, so agents never extend a
 legacy pattern.
 
 How agents use it
 
-- Atlas is mounted in every workspace. Per-repo agent instruction files stay
-  thin and point to it.
+- Atlas is cloned into every workspace from a remote published in the
+  shared environment file. Per-repo agent instruction files stay thin and
+  point to it.
+- A session reads the index page first and the newest entries of the log,
+  then the remit page, then the pages for the flows and services in scope.
 - A contract links the specific pages that bind it. The agent loads those
   first.
 - Every finished item proposes its Atlas changes as a merge request: flow
@@ -238,9 +344,15 @@ Rung 5. Regression
 Proof before code
 
 The agent's first output is the failing proofs, written from the contract.
-For tiers 2 and 3, the owner approves those proofs before any implementation
-starts. This is the cheapest review point in the whole system, and it is
-where spec-driven becomes proof-driven.
+A proof that passes before any implementation proves nothing, so it is
+fixed or dropped at this point. Then the proof list is frozen: from the
+freeze on, only its pass marks may change.
+
+For tiers 0 and 1 the session freezes the proofs itself. For tiers 2 and 3
+the remit lead approves the contract and the written, failing proofs
+together, and that approval is the freeze. Approval comes after the proofs
+exist, never before. This is the cheapest review point in the whole system,
+and it is where spec-driven becomes proof-driven.
 
 The proof bundle
 
@@ -257,17 +369,35 @@ Reviewers read the bundle instead of re-deriving the work. Product reviews
 the scenario evidence, not the diff. Build the bundle for fast human
 reading: verdict first, then evidence a person can check at a glance.
 
+Evidence depends on the kind of flow: the request and response transcript
+for an API, the full terminal transcript for a CLI, a screenshot of each
+asserted state for a UI, and a recording only where the assertion is about
+sequence or motion. Text evidence lives with the item in the queue repo.
+Large files go to a separate evidence branch or a shared directory, never
+onto the claim branch or into a code repo, so the branches every session
+reads stay small.
+
+Jira cannot be written from a workspace. Each item therefore keeps a
+ready-to-post comment, rewritten at every state change, and a mirror job or
+the engineer posts it. People who watch Jira see progress and evidence
+without sessions needing write access.
+
 Keeping the proof honest
 
 An agent that writes both the code and the tests can pass its own exam. Four
 controls prevent that:
 
-- Approved proofs are protected. Changing one after approval raises a flag
-  for the owner.
+- Frozen proofs are protected. Changing one after the freeze raises a flag
+  that the remit lead sees on the board.
+- A state cannot move without its evidence. The tool checks that every
+  proof marked passing has its saved output, and re-runs the local proofs
+  before it records Local-proven.
 - A separate verifier agent with fresh context tries to break the change
   before the bundle is built.
 - Product holds back a few scenarios the building agent never sees, and runs
-  them at UAT.
+  them at UAT. A bundle therefore says "verified against the visible
+  proofs", never "fully verified", and a failure at UAT is expected
+  information, not an anomaly.
 - Any failure found at a higher rung becomes a new test at the lowest rung
   that could have caught it.
 
@@ -311,29 +441,53 @@ loop, standard commands, durable state and a way to ask for help.
 
 The run loop
 
-1. Claim a Ready item by pushing its claim branch.
-2. Load the contract, its linked Atlas pages and the repo instructions.
-3. Write a plan and the failing proofs.
-4. Implement, run the spotlight, fix, repeat until rung 1 passes.
-5. Hand to the verifier agent. Fix what it finds.
-6. Request a test track, deploy the change set, run rung 2.
-7. Build the proof bundle and open the merge requests.
-8. Respond to review, then hand off to UAT.
+ 1. Identify the work from its Jira key and issue type.
+ 2. Claim it, before reading or drafting anything.
+ 3. Check that it is not already done, and challenge the ask.
+ 4. Load the remit page, the linked Atlas pages and the repo instructions.
+ 5. Draft the contract. The engineer approves it.
+ 6. Write the failing proofs, then freeze them.
+ 7. Implement, run the spotlight, fix, repeat until rung 1 passes.
+ 8. Hand to the verifier agent. Fix what it finds.
+ 9. Merge the default branch in and prove rung 1 again.
+10. Lease a test track, deploy the change set, run rung 2.
+11. Build the proof bundle and open the merge requests.
+12. Respond to review, then hand off to UAT.
 
 Standard commands
 
 Give every agent the same scripted tools: start a spotlight, run a proof,
 request a track, deploy a change set, build a bundle, escalate. Scripts are
 deterministic; prompts are not. Anything the system depends on should be a
-script.
+script. Coordination is the first case: claiming, saving, taking over,
+leasing and looking around ship as one tool, dq, with a self-test, so that
+several hundred sessions follow one protocol and not several hundred
+readings of a paragraph.
 
 Durable state
 
-- A run journal lives in the branch: plan, progress, decisions taken, dead
-  ends. A fresh session can resume from it.
-- Commits are small and frequent, so a failed run loses little.
+- A run journal lives with the item in the queue repo: plan, progress,
+  decisions taken, dead ends, and where to resume. A fresh session, on any
+  machine, can resume from it.
+- Commits are small and frequent, and every green commit and every journal
+  update is pushed. What is not pushed does not exist for other sessions,
+  or for the same engineer on another machine.
+- The journal records the exact spotlight, faker and verification commands
+  used, because a running spotlight and staged fakers live on one machine
+  and must be rebuilt on the next.
+- Time is measured, not felt. Every journal line carries a timestamp, and
+  worked time is counted from the claim through the heartbeats, so an
+  hours budget can be enforced.
+- A long run checkpoints and restarts from the journal before its context
+  fills.
 - A change that spans repos uses one branch name everywhere plus a
-  change-set manifest the track can deploy as a unit.
+  change-set manifest the track can deploy as a unit. Each item's code
+  lives in its own worktrees, so sessions that share a machine do not
+  overwrite each other.
+- A long-lived branch catches up by merging the default branch in, never
+  by rebasing: the branch is already pushed, and pushed history is not
+  rewritten. Rung 1 is proven again after the merge and before any track
+  run.
 
 Keep or revert
 
@@ -346,10 +500,13 @@ Getting unstuck
 
 - The same failure three times, a budget exhausted, or a stop condition met
   means park, not push on.
-- A parked agent commits one specific question to the escalations folder in
-  the queue repo, with what it tried.
-- The session takes another item. The owner answers by commit and the run
-  resumes from its journal.
+- A parked agent commits one specific question, addressed to one person,
+  to the item in the queue repo, with what it tried and what it
+  recommends.
+- The session then releases the item and ends. One session holds one item;
+  the engineer starts a fresh session for the next. The person asked
+  answers by commit, and whichever session takes the item next resumes
+  from its journal.
 
 Agent roles
 
@@ -362,41 +519,94 @@ Agent roles
 Dispatch
 
 There is no central dispatcher. Workspaces reach only git, so git is the
-queue, the lock service and the message bus. Each engineer's 6 to 12
-sessions pull work from it.
+queue, the lock service and the message bus. Each engineer's sessions pull
+work from it.
 
 Git as the control plane
 
 One queue repo, beside Atlas, holds all coordination state.
 
-  Backlog      One contract file per item under ready/, named by Jira key
-  Claim        Push branch claim/<key>. The server rejects a second create,
-               so the first push wins
-  State        A status field in the contract on its claim branch; a
-               pipeline job builds the board from all claim branches
-  Track lease  Push branch lease/track-NN holding owner and expiry; delete
-               it to release
-  Escalation   One question file under escalations/; the answer is a commit
-  Evidence     The pipeline commits each proof bundle back to the item's
-               claim branch
-  Close        The claim branch merges to main when the item reaches
-               Regressed
+  Backlog      Contracts people prepare ahead sit under ready/, named by
+               Jira key. A session can also start from a bare Jira key
+  Claim        Push branch claim/<key>, before anything else. The server
+               rejects a second create, so the first push wins
+  Card         A small file on the claim: engineer, machine, session,
+               start time, last heartbeat, state, hold, and the repos,
+               services and flows the item touches
+  Active       One session at a time works on an item. It is named on the
+  session      card, taken and released explicitly, and may be replaced
+               once it has been silent too long
+  Heartbeat    Every save updates it. A save is an ordinary push built on
+               the latest commit; a rejected push means someone else wrote
+               first, so the session fetches, merges and tries again
+  State        A field on the card, moved only with its evidence
+  Board        One generated file listing every open item, question, track
+               and request. A pipeline job builds it, so a session reads
+               one file and not hundreds of branches
+  Track lease  Branch lease/track-NN holds the holder and the expiry.
+               Taking and releasing are ordinary pushes to it. The branch
+               is never deleted
+  Escalation   One question file in the item, addressed to one person; the
+               answer is a commit
+  Evidence     Small text with the item; large files on evidence/<key>
+  Request      A missing capability, written to the harness team
+  Close        The claim merges to the default branch when the item
+               reaches Regressed or another closed state. The server side
+               archives the branch afterwards
 
-Four rules keep this sound at 600 sessions:
+Six rules keep this sound at 600 sessions:
 
-- Protect claim/* and lease/* from force-push, or the locks mean nothing.
-- One file per item and per question, so no two sessions ever edit the same
-  file.
-- A pipeline job deletes leases past expiry and releases claims that have
-  gone quiet.
+- Protect claim/*, lease/* and the other coordination branches from
+  force-push, or the locks mean nothing. Setup tests this on the real
+  server.
+- Every write is a plain push on top of the latest commit. Nothing is
+  forced, and no session deletes a branch.
+- One directory per item and one file per question, so no two sessions
+  ever edit the same file.
+- Coordination pushes start no pipelines. There are thousands a day.
+- A lease past its expiry may be taken by anyone. A claim that has gone
+  quiet is listed for the remit lead, who decides who takes it over.
 - Jira stays the record of intent, read-only. Git is the record of
   execution state.
 
+Taking over and handing over
+
+A claim locks the item. The active session is a second, smaller lock
+inside it. An engineer's own released or silent item can be resumed by any
+of their sessions, on any machine. Another engineer's item changes hands
+only as a recorded handover that the engineer or the remit lead agreed to.
+A session that finds it is no longer the active one stops at once.
+
+Looking around
+
+Before it works, and again before it uses a track, a session looks at the
+board: its own items; items that share its repos, services, flows or epic;
+items linked to it by a dependency; sessions that have gone silent; free
+tracks and the waiting list; questions addressed to its engineer. Two items
+that change the same files settle their order before either uses a track,
+and record it as a dependency on both cards.
+
+Shared knowledge of the environment
+
+Facts that are the same for every workspace are published once, in a
+shared environment file beside the manual: where Atlas and the queue are,
+how Jira is read, how tracks deploy and return results. Each workspace
+publishes its own config as well. A session searches Atlas, that file and
+the published configs before it asks its engineer anything. When a
+capability does not exist at all, it files a request to the harness team
+and says what stays unproven meanwhile.
+
+The manual itself lives in a shared repo with a version. Every session
+checks the version at the start and updates its copy, so several hundred
+copies do not drift. Only a short core is loaded on every start; the rest
+is read when it is needed.
+
 Sessions per engineer
 
-Six hundred builders against ten tracks would only build a queue. Spread
-each engineer's sessions across roles so most of the work happens below
-rung 2.
+Six hundred builders against ten tracks would only build a queue. This is
+the shape at the full cap; a remit starts at one session per engineer (see
+"Earn parallelism"). Spread each engineer's sessions across roles so most
+of the work happens below rung 2.
 
   3 to 5 sessions  Builders, one claimed item each, working at rung 1
   1 to 2 sessions  Verifiers, on a peer's items where possible
@@ -441,8 +651,18 @@ whatever the number of agents.
 
 Track scheduling
 
-- Tracks are leased, not owned. A lease is a branch in the queue repo with
-  an expiry, and it releases automatically.
+- Tracks are leased, not owned. A lease is a branch in the queue repo that
+  names the holder and an expiry. It is released by a push, and once
+  expired it can be taken by anyone. Where a person hands out tracks
+  instead, a session asks, and records the track it was given.
+- The track pipeline should refuse a deploy from an item that does not
+  hold the lease.
+- A session that finds no free track goes on a waiting list everyone can
+  see, does rung 1 work meanwhile, and parks the item after a set time.
+- After it triggers a deploy, a session looks for the results at a fixed
+  interval. Meanwhile it does only work that does not change the code
+  under test. It parks after a set time, and a run with no result after a
+  longer limit is a stop condition.
 - Every lease starts from a reset to a known baseline: main branch images
   plus seeded data.
 - Measure request-to-ready time and reset time. These set the real cycle
@@ -470,7 +690,13 @@ carry most of the load.
 
 - Define each spotlight as code: which services, which fakers, which seed
   data.
-- Map spotlights to flows. A contract names the spotlight that can prove it.
+- Map spotlights to flows. A contract names the spotlight that can prove it:
+  the smallest one that includes every service its scenarios touch. When
+  none fits, the scenario proofs move to the track rung, rung 1 is reported
+  as partial, and the missing spotlight goes to the harness team as a
+  request.
+- A workspace runs one spotlight at a time, so the sessions that share a
+  machine take turns under a local lock.
 - The more a spotlight can falsify, the fewer track hours each item needs.
   Investing here raises the ceiling without buying tracks.
 
@@ -498,12 +724,14 @@ an agent against.
   Outcome owner (Product)
     Intent, proof scenarios, UAT acceptance, the weekly mark to market
   Item owner (Engineer)
-    6 to 12 Claude sessions; every item they claim, from Ready to Regressed
+    Their Claude sessions, as many as the remit's cap allows: one at first,
+    up to 6 to 12. Every item they claim, from the claim to Regressed
   Remit lead (Senior engineer, rotating)
     What good looks like for the remit: criteria, exemplars, verification
     skills, regression health
   Harness team (Engineers)
-    Tracks, spotlights, fakers, the git queue, proof tooling
+    Tracks, spotlights, fakers, the git queue and its board, the shared
+    environment file, the manual and its tool, proof tooling
   Proof steward (Engineers)
     Suite speed, flake rate, coverage by flow
   Atlas steward (Architects)
@@ -539,6 +767,8 @@ agents and other engineers can be held to:
   lint rules.
 - Approves contracts and proofs for tiers 2 and 3, and is the escalation
   point for questions of quality.
+- Agrees handovers between engineers, and decides who takes over a claim
+  that has gone quiet.
 - Calibrates the verifier with examples of work that passed and work that
   should not have.
 - Sets the remit's session cap and its auto-merge scope.
@@ -560,7 +790,8 @@ and improve the system.
     Agents pull Ready items. Work-in-progress limits are tied to track
     capacity, not headcount.
   Daily, 15 minutes
-    Clear the escalation queue, blocked items and track queue. Async first.
+    Clear the open questions, blocked items, quiet claims and the track
+    queue, all from the board. Async first.
   Weekly
     Mark to market: objectives against items Confirmed. Set next week's
     objectives. Check the Ready inventory covers two weeks. Promote
@@ -601,13 +832,13 @@ Tier 1
 
 Tier 2
   Change:       Cross-service change, or any API, contract or schema change
-  Before build: Owner approves the proofs
+  Before build: Remit lead approves the contract and the written proofs
   To merge:     Engineer and product approve
   To prod:      Canary, then owner confirms
 
 Tier 3
   Change:       Data migration, auth, security, money, anything irreversible
-  Before build: Human-led design
+  Before build: Human-led design; remit lead approves the written proofs
   To merge:     Full human review
   To prod:      Human-run release
 
@@ -617,18 +848,30 @@ Hard rules
   only.
 - New behaviour ships flagged off. Rollback is automatic when a guardrail
   metric moves.
-- Protected paths need human review whatever the tier: approved proofs,
-  pipeline config, tier rules, faker baselines.
-- Every run leaves an audit trail: contract, journal, bundle, approvals.
+- Protected paths need human review whatever the tier: frozen proofs,
+  pipeline config, tier rules, faker baselines, the delivery manual and
+  its tool.
+- No session force-pushes, pushes to a default branch, deletes a remote
+  branch or rewrites pushed history.
+- Every run leaves an audit trail: contract, journal, bundle, approvals,
+  and a history of every state change, freeze and takeover with who and
+  when.
 
 Stop conditions
 
 An agent parks and escalates when any of these occur:
 
-- Its budget of hours, iterations or track time is spent.
+- The same failure has survived three distinct fix attempts.
+- Its budget of hours, iterations or track runs is spent.
 - The work needs a repo or service outside its scope.
 - The contract conflicts with an Atlas principle or decision.
 - A proof scenario is ambiguous or contradicts another.
+- A frozen proof appears to be wrong.
+- The remit page does not say whether the result is good enough.
+- A track run has produced no result within the set limit.
+- The environment is broken in a way the session cannot fix.
+- The next action cannot be undone.
+- A stop condition particular to the item, named in its contract, is met.
 
 When something escapes
 
@@ -656,6 +899,25 @@ move work down the tiers, not to review faster. A remit lead may widen what
 merges without human review when the change type can be checked fully by
 program and the remit's escape rate supports it. Changes that cannot be
 verified by program stay with human review, whatever the volume.
+
+Unattended runs
+
+A run that is meant to last hours stops at the first permission prompt that
+nobody is there to answer. Before a remit runs unattended:
+
+- Every command the loop uses is approved in advance by rule: git in the
+  item's worktrees, the build and test commands, the spotlight and faker
+  commands, the verification skills, the Jira read commands.
+- The session runs in a mode that refuses anything not approved in advance
+  and carries on. It never waits for an answer.
+- Hooks block a force-push, a branch deletion and a push to a default
+  branch. They send a change to a protected path to a person. They keep a
+  session from ending with unsaved work, or with a proof marked passing
+  that has no evidence.
+- The whole loop is rehearsed once in that mode before it is trusted.
+
+Hooks and rules on a workspace are guard rails. The guarantee that a claim
+cannot be overwritten is the server's branch protection.
 
 
 11. METRICS
@@ -709,7 +971,9 @@ in proven items.
 Phase 1. Pilot contract (weeks 1 to 2)
   - One remit: its lead, about six engineers, two product
   - Contract template, Atlas authority rules, proof bundle v0
-  - Queue repo with claim branches, track leases by hand
+  - Queue repo with protected claim branches, track leases by hand
+  - The coordination tool's self-test and protection check pass on a real
+    workspace against the real server
   GATE: 3 items Track-proven, each with a bundle
 
 Phase 2. Closed loop, one remit (weeks 3 to 6)
@@ -741,9 +1005,22 @@ constraint review: find the longest wait and remove it.
 These need an answer before the pilot starts, because each one changes what
 gets built.
 
-[ ] The contract file template, how Jira issues map to it, and who mirrors
-    execution state back to Jira, since sessions can only read it.
-[ ] Who approves proofs and bundles at each tier, by name or by role.
+[ ] Whether the llm-wiki is Atlas itself, as this document assumes, or a
+    separate wiki. If it is separate: where it lives, and whether any of
+    it binds.
+[ ] Who posts each item's Jira comment: a mirror job with write access, or
+    the engineer. Sessions prepare the comment and cannot post it.
+[ ] Who approves bundles at each tier, by name. Proofs for tiers 2 and 3
+    are approved by the remit lead.
+[ ] Who owns the board job and the archiving of closed claims, and how
+    often the board is rebuilt.
+[ ] Whether tracks are leased through git, or handed out by a person.
+[ ] Where large evidence goes: evidence branches in the queue repo, or a
+    shared directory.
+[ ] The thresholds: when a silent session may be replaced (120 minutes to
+    start), when a quiet claim is listed for the remit lead (3 days), when
+    an Atlas page counts as stale (90 days).
+[ ] The permission mode for unattended runs.
 [ ] Whether tier 0 changes may merge with no human review from day one.
 [ ] How track results, logs and traces return to a closed workspace. This
     doc assumes a git push triggers the track pipeline and the pipeline
@@ -754,14 +1031,16 @@ gets built.
     today, or whether those must be built first.
 [ ] Who owns faker fidelity, and how real responses are captured and
     sanitised.
-[ ] The budget per item in agent hours and track hours, and the budget for
-    more tracks.
+[ ] The budget per item in agent hours, iterations and track runs, and the
+    budget for more tracks.
 [ ] Which remit and which people form the pilot.
 [ ] How often remit leads rotate, and the handover checklist.
 
 
 14. SOURCES
 -----------
+
+Every link below was checked on 2026-11-15.
 
 - Best practices for Claude Code, Anthropic
   https://code.claude.com/docs/en/best-practices
@@ -776,3 +1055,11 @@ gets built.
 - From Vibe Coding to Agentic Engineering, Andrej Karpathy at Sequoia AI
   Ascent 2026
   https://www.youtube.com/watch?v=96jN2OCOfLs
+- LLM Wiki, Andrej Karpathy (the format section 4 gives Atlas)
+  https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
+- Hooks, permissions and skills, Claude Code documentation
+  https://code.claude.com/docs/en/hooks
+  https://code.claude.com/docs/en/permissions
+  https://code.claude.com/docs/en/skills
+- Branch protection rules, GitLab documentation
+  https://docs.gitlab.com/user/project/repository/branches/protection_rules/
