@@ -4,7 +4,8 @@ As of 2026-11-15
 
 This is the design and the reasoning. The manual that sessions follow is
 DELIVERY-AGENT.txt, in the same directory, with its parts under manual/ and
-the coordination tool at tools/dq.
+the coordination tool at tools/dq, generated from the code blocks in
+script-instructions/ (git holds no scripts).
 
 
 1. THESIS

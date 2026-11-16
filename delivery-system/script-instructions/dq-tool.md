@@ -1,3 +1,16 @@
+# The coordination tool
+
+`tools/dq`: claims, heartbeats, takeover, leases, look-around, the board,
+evidence, install and hooks. Every session calls it.
+
+Each `## <path>` section below is one script. The path is relative to the
+directory this file's parent folder sits in (delivery-system/). The script is not kept in
+git as a file: it is generated locally from the code block, and the generated
+file is ignored. See "Generating the scripts" in README.txt.
+
+## tools/dq
+
+````bash
 #!/usr/bin/env bash
 # dq - delivery queue tool for the proof-driven delivery system.
 #
@@ -15,7 +28,7 @@
 
 set -euo pipefail
 
-DQ_VERSION="0.3.0"
+DQ_VERSION="0.3.1"
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SYSTEM_DIR="$(cd "$SELF_DIR/.." && pwd)"
 ENVFILE="${DQ_ENVIRONMENT:-$SYSTEM_DIR/environment.yaml}"
@@ -80,6 +93,7 @@ Shared resources
 
 System
   dq version [--check] [--pull]   manual version; update from the shared repo
+  dq generate                     write the scripts from script-instructions/*.md
   dq doctor                       check this workspace
   dq install [--workspace DIR]    bootstrap block, skills, hooks, permissions
   dq protect-check                test that claims cannot be overwritten
@@ -1559,12 +1573,45 @@ cmd_spot() {
 
 # ------------------------------------------------------------------ system
 
+# Scripts are not kept in git. Each lives as a code block under a "## <path>"
+# heading in script-instructions/*.md, and this writes them out. Each file is
+# written beside its target and moved into place, so a running dq is not
+# overwritten under itself.
+cmd_generate() {
+  local tmp f n=0 prog
+  [ -d "$SYSTEM_DIR/script-instructions" ] || die "no script-instructions directory in $SYSTEM_DIR"
+  prog="$(cat <<'AWK'
+/^## / && !f { n = split(substr($0, 4), P, " "); next }
+/^````/ { if (f) { f = 0; for (i = 1; i <= n; i++) close(P[i]); n = 0 }
+          else if (n) { f = 1; for (i = 1; i <= n; i++) { system("mkdir -p \"$(dirname " P[i] ")\""); printf "" > P[i] } }
+          next }
+f { for (i = 1; i <= n; i++) print > P[i] }
+AWK
+)"
+  tmp="$(mktemp -d)"
+  ( cd "$tmp" && awk "$prog" "$SYSTEM_DIR"/script-instructions/*.md ) || { rm -rf "$tmp"; die "could not generate the scripts"; }
+  while IFS= read -r f; do
+    f="${f#./}"
+    mkdir -p "$SYSTEM_DIR/$(dirname "$f")"
+    chmod +x "$tmp/$f"
+    mv -f "$tmp/$f" "$SYSTEM_DIR/$f.new.$$" && mv -f "$SYSTEM_DIR/$f.new.$$" "$SYSTEM_DIR/$f"
+    echo "GENERATED=$f"
+    n=$(( n + 1 ))
+  done < <(cd "$tmp" && find . -type f | sort)
+  rm -rf "$tmp"
+  echo "SCRIPTS=$n"
+}
+
 cmd_version() {
   local check=0 pull=0 a v top b rel latest
   for a in "$@"; do case "$a" in --check) check=1 ;; --pull) check=1; pull=1 ;; *) die "version: unknown option $a" ;; esac; done
   v="$(cat "$SYSTEM_DIR/VERSION" 2>/dev/null || echo unknown)"
   echo "DQ=$DQ_VERSION"
   echo "VERSION=$v"
+  if [ "$v" != unknown ] && [ "$v" != "$DQ_VERSION" ]; then
+    echo "TOOL=stale"
+    note "This dq ($DQ_VERSION) does not match the manual ($v). Run: dq generate"
+  fi
   if [ "$check" = 0 ]; then return 0; fi
   top="$(git -C "$SYSTEM_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
   if [ -z "$top" ]; then
@@ -1587,6 +1634,7 @@ cmd_version() {
   if [ "$pull" = 1 ]; then
     if git -C "$top" merge -q --ff-only "origin/$b" 2>"$TMPERR"; then
       echo "UPDATED_TO=$(cat "$SYSTEM_DIR/VERSION" 2>/dev/null || echo unknown)"
+      if [ -d "$SYSTEM_DIR/script-instructions" ]; then cmd_generate; fi
       note "Read $SYSTEM_DIR/CHANGELOG.txt for what changed, then re-read the parts it names."
     else
       note "could not fast-forward: $(head -n1 "$TMPERR"). Tell the engineer."
@@ -1936,6 +1984,7 @@ main() {
     lease) cmd_lease "$@" ;;
     spot) cmd_spot "$@" ;;
     version) cmd_version "$@" ;;
+    generate) cmd_generate "$@" ;;
     doctor) cmd_doctor "$@" ;;
     install) cmd_install "$@" ;;
     protect-check) cmd_protect_check "$@" ;;
@@ -1948,3 +1997,4 @@ main() {
   esac
 }
 main "$@"
+````

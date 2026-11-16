@@ -34,9 +34,23 @@ A working design for running delivery this way with a real team: several hundred
 | [`delivery-system/DELIVERY-AGENT.txt`](delivery-system/DELIVERY-AGENT.txt) | The core manual every session reads at the start |
 | [`delivery-system/manual/`](delivery-system/manual/) | The parts read when needed: concepts, setup, deliver, coordinate, templates |
 | [`delivery-system/proof-driven-delivery-system.txt`](delivery-system/proof-driven-delivery-system.txt) | The spec: why the system is shaped this way |
-| [`delivery-system/tools/dq`](delivery-system/tools/dq) | The coordination tool, with [`selftest.sh`](delivery-system/tools/selftest.sh) |
+| [`delivery-system/script-instructions/`](delivery-system/script-instructions/) | The coordination tool and its tests, as markdown code blocks |
 | [`FEEDBACK.txt`](FEEDBACK.txt) | A review of version 0.2 at 300 to 600 sessions |
 | [`FEEDBACK-RESOLUTION.txt`](FEEDBACK-RESOLUTION.txt) | Each point of that review, and where it was fixed |
+
+## Generating the scripts
+
+Git holds no scripts or executables. Each one lives as a fenced code block under a `## <path>` heading in a `script-instructions/*.md` file, and is generated locally; the generated files are ignored. From the repository root, for `test-presentation.js`, and from `delivery-system/`, for the delivery tools:
+
+```bash
+awk '/^## / && !f { n = split(substr($0, 4), P, " "); next }
+     /^````/ { if (f) { f = 0; for (i = 1; i <= n; i++) close(P[i]); n = 0 }
+               else if (n) { f = 1; for (i = 1; i <= n; i++) { system("mkdir -p \"$(dirname " P[i] ")\""); printf "" > P[i] } }
+               next }
+     f { for (i = 1; i <= n; i++) print > P[i] }' script-instructions/*.md
+```
+
+Edit the code block, not the generated file.
 
 ## Deployment
 

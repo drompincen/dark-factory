@@ -1,3 +1,15 @@
+# Presentation test
+
+`test-presentation.js` opens index.html in a headless browser and fails any
+slide whose content overflows the screen. It needs puppeteer.
+
+The `## <path>` section below is one script, its path relative to the
+repository root. It is not kept in git as a file; generate it with the awk
+command in README.md, under "Generating the scripts".
+
+## test-presentation.js
+
+````javascript
 const puppeteer = require('puppeteer-core');
 const path = require('path');
 const fs = require('fs');
@@ -157,3 +169,4 @@ const fs = require('fs');
 
   await browser.close();
 })();
+````

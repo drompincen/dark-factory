@@ -1,6 +1,6 @@
 DELIVERY AGENT OPERATING MANUAL
 ===============================
-Version 0.3 - the core. Every session reads this part, and only this part,
+Version 0.3.1 - the core. Every session reads this part, and only this part,
 at the start. The rest is read when it is needed:
 
   manual/CONCEPTS.txt     what the words mean. Read it the first time you
@@ -16,6 +16,8 @@ at the start. The rest is read when it is needed:
 
 "dq" below is the coordination tool, tools/dq in this directory. Call it by
 the full path your workspace instructions give. "dq help" lists its commands.
+Git holds no scripts: tools/ is generated from script-instructions/*.md. If
+tools/dq is missing, generate it as README.txt says before anything else.
 
 
 FOR THE HUMAN
@@ -24,7 +26,8 @@ FOR THE HUMAN
 Once, by the harness team: put this directory in the shared repo and fill
 in environment.yaml. README.txt has the checklist.
 
-Once per workspace, by the engineer:  tools/dq install --workspace <root>
+Once per workspace, by the engineer: generate the scripts (README.txt), then
+  tools/dq install --workspace <root>
 
 Every session: start Claude Code in the workspace and say "start", or name
 the work: "Deliver PAY-1423". If you name nothing, it asks for the Jira epic
@@ -147,7 +150,8 @@ Get your bearings before anything else.
 
 1. Version.  dq version --check
    STATUS=behind: run "dq version --pull", read CHANGELOG.txt, and re-read
-   the parts it names. STATUS=unmanaged: tell the engineer this copy
+   the parts it names. The pull regenerates the scripts. TOOL=stale: run
+   "dq generate". STATUS=unmanaged: tell the engineer this copy
    cannot be kept current.
 2. Workspace.  dq doctor
    No config, or setup_complete is false: read manual/SETUP.txt and do the

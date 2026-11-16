@@ -1,6 +1,6 @@
 PROOF-DRIVEN DELIVERY SYSTEM
 ============================
-Version 0.3
+Version 0.3.1
 
 This directory is everything a Claude Code session needs to take a Jira
 epic or story and deliver it with proof, alongside several hundred other
@@ -24,14 +24,16 @@ WHAT IS HERE
     TEMPLATES.txt          every file a session writes
   proof-driven-delivery-system.txt
                          The spec: why the system is shaped this way.
-  tools/dq               The coordination tool. One bash script; needs
-                         bash 4, git 2.20 and the usual core utilities.
-                         python3 is used when present, for JSON.
-  tools/selftest.sh      Runs dq against throwaway repos. Run it once in
-                         your environment before relying on dq.
-  tools/walkthrough.sh   One delivery, command by command, from install to
-                         a closed item, in a throwaway world. Read its
-                         output to see what a session does.
+  script-instructions/   The scripts, kept as code blocks in markdown. No
+                         script or executable is kept in git; each is
+                         generated into tools/ (below), which git ignores.
+    dq-tool.md             tools/dq, the coordination tool. One bash
+                           script; needs bash 4, git 2.20 and the usual
+                           core utilities. python3 is used when present.
+    test-scripts.md        tools/selftest.sh, which runs dq against
+                           throwaway repos, and tools/walkthrough.sh, one
+                           delivery command by command, from install to a
+                           closed item.
   templates/             The files a session writes.
   environment.example.yaml
                          Copy to environment.yaml and fill in once.
@@ -42,9 +44,32 @@ WHAT IS HERE
   VERSION, CHANGELOG.txt
 
 
+GENERATING THE SCRIPTS
+----------------------
+
+Git holds no scripts. Each lives as a code block under a "## <path>"
+heading in script-instructions/*.md. To write them out, run this in this
+directory (it needs only awk):
+
+        awk '/^## / && !f { n = split(substr($0, 4), P, " "); next }
+             /^````/ { if (f) { f = 0; for (i = 1; i <= n; i++) close(P[i]); n = 0 }
+                       else if (n) { f = 1; for (i = 1; i <= n; i++) { system("mkdir -p \"$(dirname " P[i] ")\""); printf "" > P[i] } }
+                       next }
+             f { for (i = 1; i <= n; i++) print > P[i] }' script-instructions/*.md
+        chmod +x tools/*
+
+Once dq exists, "dq generate" does the same, and "dq version --pull" does
+it after every update. "dq version" says TOOL=stale when the generated dq
+is older than the manual.
+
+To change a script: edit its code block, generate, test, commit the
+markdown. A change made only in tools/ never reaches git.
+
+
 ONCE, BY THE HARNESS TEAM
 -------------------------
 
+ 0. Generate the scripts (above).
  1. Put this directory in a shared repo. In environment.yaml, set
     system.remote and system.path_in_repo.
  2. Run tools/selftest.sh on a coder workspace. It should end with
@@ -94,7 +119,8 @@ ONCE PER WORKSPACE, BY THE ENGINEER
 -----------------------------------
 
     git clone <system.remote> <somewhere>
-    <somewhere>/<path_in_repo>/tools/dq install --workspace <workspace root>
+    cd <somewhere>/<path_in_repo>        then generate the scripts (above)
+    tools/dq install --workspace <workspace root>
 
 That adds a short block to the workspace's CLAUDE.md, three skills, two
 hooks and a few permission rules, and drops an empty delivery.config.yaml.

@@ -13,7 +13,8 @@ with a slash.
   CONCEPTS    manual/CONCEPTS.txt
   SPEC        proof-driven-delivery-system.txt
   ENV         environment.example.yaml
-  dq          tools/dq, the coordination tool (new)
+  dq          tools/dq, the coordination tool (new), kept as a code block in
+              script-instructions/dq-tool.md and generated locally
 
 Read "What I assumed" and "What only your environment can settle" at the
 end before relying on this.
@@ -245,7 +246,7 @@ WHERE I DEPARTED FROM THE SUGGESTIONS
 WHAT I ADDED THAT THE REVIEW DID NOT ASK FOR
 --------------------------------------------
 
-- The coordination protocol as a tool, dq, with a self-test of 259 checks
+- The coordination protocol as a tool, dq, with a self-test of 264 checks
   against simulated machines. Prose would have been read several hundred
   slightly different ways.
 - One spotlight lock per workspace and one worktree per item, because

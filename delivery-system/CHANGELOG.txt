@@ -5,6 +5,17 @@ A session that finds itself behind (dq version --check) reads the entries
 newer than its own version and re-reads the parts they name.
 
 
+0.3.1   2026-11-16
+------------------
+Re-read: README.txt, "Generating the scripts".
+
+- Git holds no scripts or executables. dq, selftest.sh and walkthrough.sh
+  live as code blocks in script-instructions/*.md and are generated into
+  tools/, which git ignores. Same scheme as drom-flow.
+- New: "dq generate". "dq version --pull" regenerates after updating, and
+  "dq version" reports TOOL=stale when dq is older than the manual.
+
+
 0.3.0   2026-11-15
 ------------------
 Re-read: everything. The manual was restructured.

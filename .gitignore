@@ -1,1 +1,11 @@
 node_modules/
+
+# No scripts or executables in git. They live as code blocks in
+# script-instructions/*.md and delivery-system/script-instructions/*.md and are
+# generated locally (see README.md, "Generating the scripts").
+*.sh
+*.js
+*.bat
+*.cmd
+*.ps1
+delivery-system/tools/
