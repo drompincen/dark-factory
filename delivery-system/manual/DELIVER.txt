@@ -1,0 +1,590 @@
+DELIVER: FROM A JIRA KEY TO PROOF
+=================================
+Part of the delivery manual, v0.3. Read DELIVERY-AGENT.txt first.
+
+SESSION is the id that "dq claim" or "dq take" printed for you; pass it with
+-s. The item's files live in the directory "dq path KEY" prints. Create each
+file with "dq new KEY ..." so it starts from its template.
+
+The steps:
+
+   0  Identify the work           10  Write failing proofs, then freeze
+   1  Claim it                    11  Implement at rung 1
+   2  Is it already done?         12  Verify with fresh eyes
+   3  Read                        13  Catch up and re-prove
+   4  Restate the problem         14  Prove on a test track
+   5  Challenge the ask           15  Build the bundle
+   6  Draft the contract          16  Open merge requests
+   7  Classify the tier           17  Feed the system
+   8  Confirm the contract        18  Report and release
+   9  Branch and plan             19  After the humans act
+
+Given several tickets: run steps 0 to 2 for each, point out dependencies,
+and deliver the one the engineer picks. The others are for other sessions.
+
+
+Step 0. Identify the work
+-------------------------
+
+You need a Jira key. If the engineer gave none, ask: "Which Jira epic or
+story?"
+
+Read the issue with jira.read_command. If Jira cannot be read from here,
+ask the engineer to paste it: key, type, status, resolution, summary,
+description, acceptance, parent, children and links.
+
+Note its type, its status and resolution, its parent epic, and its linked
+and duplicate issues. Then branch on the type:
+
+  epic       Go to "Epic path" at the end of this file.
+  story,     Continue with step 1.
+  task
+  bug        Continue. In step 10 the first proof reproduces the bug.
+  spike      Go to "Spike path". Its output is a decision, not code.
+  sub-task   It belongs to its parent story. Run "dq whois PARENT". If
+             someone holds the parent, the sub-task is theirs: tell the
+             engineer and stop. If nobody does, deliver the parent story
+             and treat its sub-tasks as steps in the plan.
+
+Pick the remit. Look up the ticket's Jira project and component in the
+project map (atlas.project_map in environment.yaml). It gives the remit,
+its page and lead, the flows and the repos. No entry: ask the engineer, and
+propose the entry in step 17.
+
+- The remit is not your engineer's (remit.name in the config): say so now.
+  Either the engineer confirms they are covering it, in which case that
+  remit's page and lead apply and not your own, or the ticket goes back.
+- The ticket crosses remits: the remit whose outcome it moves is primary,
+  and its lead approves. List the others in the contract. Before tier 2 or
+  3 work changes a flow another remit owns, ask that remit's lead with an
+  escalation addressed to them.
+
+
+Step 1. Claim it
+----------------
+
+    dq claim KEY --kind story --epic EPIC --remit REMIT
+
+  CLAIMED   Note SESSION and ITEM_DIR. Write what step 0 found into the
+            journal.
+  TAKEN     Someone holds it. Stop, and tell the engineer who. Do not
+            work on it alongside them.
+  CLOSED    It was delivered before. Read items/KEY/ on the queue's
+            default branch and carry what it says into step 2. Claim
+            again with --reopen only if step 2 shows real work remains.
+
+As soon as you know them, put the scope on the card so others can see what
+you will touch, then look at who is near:
+
+    dq beat KEY -s SESSION --set repos=a,b --set services=x --set flows=f
+    dq look --near KEY
+
+Anything listed under NEAR matters in steps 6 and 13.
+
+
+Step 2. Is it already done?
+---------------------------
+
+    dq done-check KEY
+
+It checks the queue (an open claim, a closed item), every repo in the
+config (commits and branches that name the key) and Atlas pages that name
+the key. Then do the checks only you can do:
+
+- Jira: status, resolution, linked and duplicate issues.
+- Near-duplicates: the same work under another key. Search Jira by the
+  title's main nouns and by component (jira.search_command). Look for the
+  same flow on the board (dq look --all). Search git history by keyword.
+- Atlas: a decision or agreed flow that already describes the behaviour.
+- The product: drive the flow in a spotlight with the remit's
+  verification skill. Does it already behave as the ticket asks?
+
+Outcomes:
+
+a. Already satisfied. Write the small bundle and close:
+       dq new KEY summary     Verdict "Already satisfied", by which commit
+                              or item, with the proof run that shows it
+       dq new KEY jira        recommend closing, with the evidence
+       dq state KEY -s SESSION Satisfied
+       dq release KEY -s SESSION
+   Tell the engineer and product. This saves a whole delivery.
+b. Partly done. Narrow the contract to what is missing, and record the
+   other item under depends_on.
+c. A duplicate of an open item. Tell the engineer and product, record the
+   other key in the journal, and release with --hold parked and the
+   reason. If product withdraws the ticket:
+       dq state KEY -s SESSION Cancelled --by NAME
+d. Not done. Continue.
+
+
+Step 3. Read
+------------
+
+- The remit page: criteria for good, exemplars, known traps. This is the
+  standard you will be judged by.
+- Atlas, from its index page: the principles, decisions and agreed flows
+  that touch this area, the target state for the flow, the lessons. Check
+  each page's status and date before relying on it (DELIVERY-AGENT.txt,
+  section 2). List the pages you relied on under constraints in the
+  contract, each with its status and date.
+- The flow map entry for each flow, the service catalog entry for each
+  service in scope, and the glossary for any term you cannot place.
+- Any other knowledge source the config names. Context only.
+- The code the change will touch. For broad exploration use a subagent
+  and keep only its summary.
+
+Pick the spotlight. From the spotlight catalog, take the smallest one that
+includes every service your proof scenarios touch. If two would do, take
+the one the flow map names. If none covers the flow:
+
+1. See whether a listed spotlight plus a faker for the missing service
+   would do. If so, that faker scenario becomes part of this work.
+2. Otherwise write "none fits" in the contract. Prove what unit and
+   contract tests can prove locally, move the scenario proofs to the track
+   rung, and file a harness request for the missing spotlight. Say in
+   your report that rung 1 is partial.
+
+
+Step 4. Restate the problem
+---------------------------
+
+Before proposing anything, write the problem in your own words in the
+journal: what is observed or wanted, for whom, and how you will know it is
+done. Do not adopt the ticket's theory of the cause without checking it.
+
+
+Step 5. Challenge the ask
+-------------------------
+
+Four checks. Write each result into the challenge block of the contract.
+
+1. Does it move the North Star? Name the line or objective it moves, and
+   how. If you cannot link one, do not fill the field loosely. That is a
+   failed check.
+2. Does it fit current objectives? Read the latest weekly mark to market.
+   Is this outcome among the objectives for this period?
+3. Does it extend a legacy flow? Check the flow's status in Atlas (legacy,
+   transitional or target) and what the target state says.
+4. Would a smaller change get the same outcome?
+
+Then:
+
+- All four pass: record "passed" and continue.
+- Check 1 or 3 fails, or the ask contradicts the target state: write the
+  challenge and do not build until product answers.
+      dq new KEY challenge
+      dq beat KEY -s SESSION --hold challenge --reason "..."
+  Tell the engineer. Product writes the answer into the file. You may go
+  on reading and drafting meanwhile, not implementing.
+- Check 2 or 4 raises a concern: write the challenge the same way and
+  tell the engineer. Continue only on the engineer's explicit go-ahead,
+  recorded in the journal. Product still answers.
+
+When the answer arrives, record it under challenge.result and act on it.
+
+
+Step 6. Draft the contract and the proof list
+---------------------------------------------
+
+    dq new KEY contract
+    dq new KEY proofs
+
+The contract is your definition of done. Say what and why; leave how for
+the plan.
+
+Writing success criteria. Each criterion names what is observed, the exact
+condition, and how it is observed. Kinds of observable: a response (status,
+a body field), stored state (a row, a document), an emitted event, a screen
+element, a command's exit code and output, a metric with a threshold and a
+window. Vague acceptance becomes measurable like this:
+
+  "Refunds should be fast."
+      observed   time from the refund request to "settled" in the ledger
+      condition  95th percentile under 2 seconds over 200 requests
+      how        the verification skill's timing run, in the spotlight
+  "Handle provider errors gracefully."
+      observed   the API response and the ledger when the provider faker
+                 returns an error
+      condition  an "upstream unavailable" response, no ledger row written,
+                 one retry event emitted
+      how        scenario S2
+  "The page shows the new status."
+      observed   the status badge on the order page after settlement
+      condition  the text "Refunded", within 5 seconds
+      how        a UI scenario, with a screenshot at that state
+
+When the ticket gives no threshold, propose one: from an Atlas principle or
+service objective, or from current behaviour that you measure. Mark it as
+proposed and put it under open_questions for product or the remit lead to
+confirm. Never invent a threshold silently.
+
+Also in the contract:
+
+- proof_scenarios: given, when, then, and the faker responses each needs.
+- proofs_by_rung: which scenarios are proven at local, track, uat and
+  prod. The uat entries are run by product, who also hold back scenarios
+  you will never see.
+- depends_on and blocks: from what "dq look --near" showed.
+- stop_conditions: any that are particular to this item.
+- budget: hours, iterations and track runs. Defaults are in the shared
+  environment file.
+
+In proofs.json, one entry per proof: its scenario, its rung, the exact
+command, where its evidence is saved, and "passes": false.
+
+
+Step 7. Classify the tier
+-------------------------
+
+Use the highest that applies, and write it in the contract.
+
+  Tier 0  Tests, docs, refactors with no behaviour change, dependency bumps
+  Tier 1  Behaviour change inside one service, behind a flag
+  Tier 2  More than one service, or any API, contract or schema change
+  Tier 3  Data migration, auth, security, money, anything irreversible
+
+Tier 3 is human-led: offer analysis and a plan, and build only what the
+engineer directs. Match effort to tier. A one-line fix needs no design
+comparison.
+
+
+Step 8. Confirm the contract
+----------------------------
+
+Show the engineer the restatement, the challenge result and the contract.
+Ask at most five questions, only ones whose answers change the proofs or
+the scope. The engineer approves the contract for every tier: write their
+name and the date under approved_by.
+
+For tiers 2 and 3 the remit lead also approves, in step 10, once the
+proofs exist. That approval covers the contract and the written proofs
+together.
+
+
+Step 9. Branch and plan
+-----------------------
+
+    dq work KEY <repo path> <repo path> ...
+
+This gives one worktree per repo on branch item/KEY, the same branch name
+everywhere, so a track can deploy the change set as a unit and sessions
+that share this machine do not collide. If a spotlight here can only run
+from the main checkouts (workspace.spotlight_from_worktree is "no"), only
+one builder at a time can use them: ask the engineer which session that is.
+
+Write the plan in the journal: the files to change, the order, and which
+proof each step should turn green. If the change can be described in one
+sentence, the plan is that sentence. Tier 2 and above, where the design is
+open: sketch two or three approaches, compare them against the remit
+criteria, and record why the chosen one wins.
+
+
+Step 10. Write failing proofs, then freeze them
+-----------------------------------------------
+
+Write the unit, contract and scenario proofs that express the contract.
+Run them and save the failing output under bundle/rung1/failing-first/.
+
+- A proof that passes before any implementation proves nothing. Fix it or
+  drop it now, while that is still allowed.
+- If every proof passes before you have changed anything, go back to
+  step 2: the work may already be done.
+- A bug: the first proof reproduces it, and fails for the reported reason.
+
+Commit the proofs on item/KEY and push. Then freeze:
+
+  Tiers 0 and 1    dq freeze KEY -s SESSION
+  Tiers 2 and 3    Ask the remit lead to approve the contract and the
+                   written proofs. If they are not in the session, write an
+                   escalation addressed to them and hold:
+                       dq new KEY escalation --to "remit lead NAME"
+                       dq beat KEY -s SESSION --hold waiting-approval
+                   When they approve:
+                       dq freeze KEY -s SESSION --by NAME
+
+Then:    dq state KEY -s SESSION Claimed
+
+From the freeze on, only "passes" may change. dq puts a flag on the card,
+where the remit lead sees it, if anything else in proofs.json changes.
+
+
+Step 11. Implement at rung 1
+----------------------------
+
+Loop: change, run the smallest relevant proof, read the failure, fix.
+
+- The spotlight. Take the workspace's spotlight before starting it, and
+  release it when you stop it:
+      dq spot take KEY -s SESSION        dq spot release -s SESSION
+  If it is busy, do work that does not need it and try again.
+- Drive the real flow with the remit's verification skill. Stage the faker
+  responses the scenarios need. New faker scenarios are part of the change
+  and are committed with it.
+- Record the exact spotlight, faker and verification commands under
+  "Rebuild local state" in the journal, so another machine can get back to
+  where you are.
+- Log each attempt in the journal under its own "### Attempt N" heading,
+  with the time.
+- A green step: commit, then
+      dq push KEY -s SESSION
+  which pushes the item branches and saves the item files.
+- A worse result: reset to the last green commit (rule 6).
+- Set "passes" to true only after running that proof's command and saving
+  its output at its evidence path.
+
+Evidence, by kind of flow:
+
+  API   the request and response transcript
+  CLI   the full terminal transcript: command, output, exit code
+  UI    a screenshot of each asserted state. A recording only when the
+        assertion is about sequence or motion.
+
+Text evidence stays in bundle/. Screenshots, recordings and full logs go
+out with "dq evidence KEY -s SESSION FILE...". Never put them on the claim
+branch or in a code repo. dq refuses files over evidence.max_file_kb.
+
+Before calling rung 1 done, run the full unit and contract suites of every
+touched repo, lint and build, and every scenario through the running flow.
+
+Checkpoint so the work survives you. At every state change, every ten
+attempts, and at least hourly: update "Resume from" in the journal and run
+"dq beat". After your context has been compacted, or after three hours in
+one session, finish the current attempt, checkpoint, run "dq release", and
+tell the engineer to start a fresh session. It resumes from the journal.
+
+
+Step 12. Verify with fresh eyes
+-------------------------------
+
+The session that wrote the change is a poor judge of it. Start a verifier
+subagent and give it only the contract, proofs.json, the diff, and the
+remit criteria with its exemplars. Ask it to try to show the change fails
+the contract or breaks something else, by running things, not by reading
+alone. Ask it to report only gaps that affect correctness or the contract.
+
+If you cannot start a subagent, say so and ask the engineer to run the
+check from a second session.
+
+    dq new KEY verification        record the findings and what was done
+    dq state KEY -s SESSION Local-proven
+
+That last command re-runs the local proofs and refuses if one fails.
+
+
+Step 13. Catch up and re-prove
+------------------------------
+
+Other sessions merge while you work. Before a track run, and again before
+opening merge requests:
+
+1. In each repo, fetch the default branch. If it moved, merge it into
+   item/KEY. Do not rebase: the branch is pushed, and rule 10 forbids
+   rewriting pushed history. A merge request can squash at the end.
+2. Re-run rung 1 in full:   dq check-proofs KEY --rung local
+3. Push:                    dq push KEY -s SESSION
+4. Check for collisions:    dq overlap KEY <worktree>     in each repo
+                            dq look --near KEY
+
+If another open item changes the same files or the same flow, settle the
+order before either of you uses a track. Write an escalation addressed to
+that item's owner, and record the link on your card:
+
+    dq new KEY escalation --to "ENGINEER (owner of OTHERKEY)"
+    dq beat KEY -s SESSION --set depends_on=OTHERKEY
+
+
+Step 14. Prove on a test track
+------------------------------
+
+Level 1 (this workspace cannot run a track): "dq new KEY handoff", fill it
+in, leave the state at Local-proven, and go to step 15.
+
+a. Get a track. How depends on tracks.lease_method:
+     branch     dq lease take any KEY -s SESSION
+     assigned   A person hands out tracks. Ask the engineer or the track
+                coordinator with an escalation, and write the track you
+                are given in the journal.
+     unknown    Treat this workspace as Level 1, and file a harness
+                request to have leases defined.
+   No track free: see COORDINATE.txt, "Waiting for a free track".
+b. Deploy the change set the way tracks.deploy_trigger says. Write the
+   time, the track and the commits in the journal.
+c. Wait for the results at tracks.results_path. COORDINATE.txt, "Waiting
+   for a track run", says how often to look, what to do meanwhile and
+   when to give up.
+d. Read the results fully. Save them under bundle/rung2/, with large logs
+   through "dq evidence". Set "passes" for each track proof.
+e. A failure: reproduce it locally if a spotlight can, add a rung 1 proof
+   that would have caught it, and return to step 11. Every run counts
+   against budget.track_runs.
+f. Release the track the moment you have results:
+       dq lease release TRACK -s SESSION
+
+
+Step 15. Build the bundle
+-------------------------
+
+    dq new KEY summary
+    dq new KEY jira
+
+In the summary, the verdict comes first, then evidence a person can check
+at a glance. It must let a reviewer judge the change without re-running
+anything. Write "verified against the visible proofs": product holds back
+scenarios for UAT, so you cannot claim more.
+
+jira-update.md holds the comment for the ticket. You cannot post it; the
+mirror job or the engineer does. Rewrite it at every state change.
+
+    dq state KEY -s SESSION Track-proven
+
+
+Step 16. Open merge requests
+----------------------------
+
+Level 3: one merge request per repo from item/KEY, each linking the
+contract and the bundle (queue repo, branch claim/KEY, items/KEY/). At any
+other level, list the branches for the engineer.
+
+
+Step 17. Feed the system
+------------------------
+
+On a branch in Atlas, never its default branch, propose:
+
+- The flow as it now behaves, and any flow map entry that changed.
+- Any decision made during the work.
+- Each lesson, together with the check that would enforce it: a lint
+  rule, a test, a hook, or an addition to the verification skill.
+- Anything you did by hand twice, as an addition to the verification
+  skill.
+- Pages you found stale or wrong, and missing project map or glossary
+  entries.
+
+
+Step 18. Report and release
+---------------------------
+
+Tell the engineer, briefly:
+
+- The state reached and what proves it
+- What you did not test, and known risks
+- Decisions you made that they should check
+- What you need from them next, including posting jira-update.md if no
+  mirror job does it
+
+Then give up the active session, so any session can pick the item up when
+the humans have acted:
+
+    dq release KEY -s SESSION --hold waiting-approval --reason "in review"
+
+
+Step 19. After the humans act
+-----------------------------
+
+Review comments: take the item again, address them, re-run the affected
+proofs, update the bundle.
+
+UAT. Product runs its scenarios, including ones you have never seen. A
+failure there is normal information. Fix the cause, and add a rung 1 proof
+for the kind of failure, not only for the one case.
+
+People confirm the later states, and their names are recorded:
+
+    dq state KEY -s SESSION UAT-proven --by NAME
+    dq state KEY -s SESSION Live --by NAME
+    dq state KEY -s SESSION Confirmed --by NAME
+
+When the item is confirmed in prod, make sure its scenarios are in the
+permanent regression suite at the rungs the contract names. Then:
+
+    dq state KEY -s SESSION Regressed --by NAME
+
+Close it the way queue.close_method says: "merge_request", open one from
+claim/KEY to the queue's default branch; "pipeline", nothing more to do;
+"manual", tell the engineer.
+
+
+EPIC PATH
+---------
+
+An epic is not delivered; it is split into stories that are.
+
+1. Claim the epic, so nobody else splits it at the same time:
+       dq claim EPIC --kind epic
+   TAKEN: stop and tell the engineer.
+2. Read the epic. List its stories with jira.children_command, or ask the
+   engineer to paste them: key, type, status, summary.
+3.     dq new EPIC decomposition
+   Map the epic's acceptance onto stories. An existing story is an entry.
+   Acceptance that no story covers becomes a proposed story: you cannot
+   create Jira issues, so write it for product to create.
+4. For each story that is neither closed nor held (dq whois STORY, dq
+   done-check STORY): draft its contract into children/STORY.yaml in the
+   epic's item directory, starting from templates/contract.yaml.
+5. Order the stories by dependency and write the order.
+6. Show the engineer the decomposition, and show product the proposed
+   stories.
+7.     dq state EPIC -s SESSION Decomposed
+       dq release EPIC -s SESSION
+8. This session may now deliver the first story nothing blocks: step 1,
+   with --epic EPIC, starting from its drafted contract. The other
+   stories are for other sessions. They find the drafts with:
+       git show origin/claim/EPIC:items/EPIC/children/STORY.yaml
+
+When product has created the proposed stories, a session takes the epic
+again and replaces the placeholders with the real keys.
+
+
+SPIKE PATH
+----------
+
+A spike answers a question. Claim it with --kind spike. It has no item
+branches and no tier.
+
+- The contract's success criteria are the questions to answer.
+- The proofs are the experiments, measurements or readings that answer
+  them, each with its evidence.
+- The output is an Atlas decision record proposed on a branch, or drafted
+  contracts for follow-up stories, or both.
+
+When the engineer accepts the answers, write the summary (questions,
+answers, evidence, the decision) and record it:
+
+    dq state KEY -s SESSION Satisfied
+
+
+VERIFICATION SKILLS
+-------------------
+
+A verification skill is a script, plus short instructions, that lets any
+session operate one flow of the real product: start the spotlight, stage
+fakers, drive the flow through its API, CLI or UI, capture what happened,
+and return pass or fail with the evidence.
+
+- If the remit has one for the flow, use it. Do not improvise your own.
+- If it does not, building it is the first deliverable, before the
+  ticket. Agree that with the engineer. Keep it small: one flow, one
+  command.
+- When you check something by hand for the second time, add it to the
+  skill in the same change.
+- When the skill is wrong about the product, fix the skill and the flow
+  map entry, and say so in the report.
+
+
+IMPROVEMENT LOOPS
+-----------------
+
+Some tickets are a number, not a feature: suite duration, flake rate,
+start-up time, a latency target. With the engineer's agreement, run a loop
+in place of steps 9 to 12:
+
+1. Agree the one metric, the command that measures it, a fixed time
+   budget per experiment, and the guard: all existing proofs still pass.
+2. Change one thing. Measure.
+3. Better, and the guard holds: commit and push. Otherwise: reset.
+4. Log every experiment, kept or discarded, as an attempt in the journal.
+5. Repeat until the budget or the target is reached.
+
+Use this only where better is a single number that is hard to game. If the
+number improves because the measurement got easier, not because the
+product got better, stop and report it.

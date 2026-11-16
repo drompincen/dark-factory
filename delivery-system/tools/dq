@@ -25,7 +25,7 @@ cleanup() { rm -f "$TMPERR"; if [ -n "$IDX" ]; then rm -f "$IDX"; fi; }
 trap cleanup EXIT
 
 STATES="Draft Ready Claimed Local-proven Track-proven UAT-proven Live Confirmed Regressed Satisfied Cancelled Decomposed"
-HOLDS="none parked waiting-track waiting-approval waiting-answer challenge"
+HOLDS="none parked waiting-track waiting-results waiting-approval waiting-answer challenge"
 CARD_SCOPE_KEYS="kind epic remit tier repos services flows depends_on blocks"
 BOARD_FIELDS="kind state hold engineer active_session active_machine heartbeat_at claimed_at remit epic repos services flows depends_on blocks proofs_flag hold_since tier"
 BOARD_HEADER="$(printf 'key\tkind\tstate\thold\tengineer\tsession\tmachine\theartbeat_at\tclaimed_at\tremit\tepic\trepos\tservices\tflows\tdepends_on\tblocks\tflag\thold_since\ttier')"
@@ -1348,6 +1348,20 @@ lease_is_free() { # after lease_read
   if [ "$(age_sec "$L_EXPIRES")" -gt 0 ]; then return 0; fi
   return 1
 }
+active_session_of() { # KEY -> the active session on the item's card, or empty
+  local tip
+  tip="$(remote_tip "claim/$1")"
+  if [ -z "$tip" ]; then return 0; fi
+  fetch_branch "claim/$1" || return 0
+  Q show "$tip:items/$1/claim.yaml" 2>/dev/null | sed -n 's/^active_session:[ \t]*//p' | head -n1
+}
+# A lease belongs to its item. The session that took it may act on it, and
+# so may whichever session is now active on that item.
+lease_is_mine() { # KEY SESSION (after lease_read)
+  if [ -n "$L_SESSION" ] && [ "$L_SESSION" = "$2" ]; then return 0; fi
+  if [ -n "$L_HOLDER" ] && [ "$L_HOLDER" != none ] && [ "$L_HOLDER" = "$1" ] && [ "$(active_session_of "$1")" = "$2" ]; then return 0; fi
+  return 1
+}
 lease_tracks() { # configured names plus any lease branch on the remote
   { csv_norm "$(setting tracks names "" DQ_TRACKS)"
     Q ls-remote origin 'refs/heads/lease/*' 2>/dev/null | awk '{ sub("refs/heads/lease/", "", $2); print $2 }'
@@ -1396,7 +1410,7 @@ cmd_lease() {
       tmp="$(mktemp)"
       for t in $track; do
         lease_read "$t"
-        if lease_is_free || [ "$L_SESSION" = "$sess" ]; then
+        if lease_is_free || lease_is_mine "$key" "$sess"; then
           exp="$(from_epoch $(( $(date -u +%s) + minutes * 60 )))"
           printf 'track: %s\nholder: %s\nsession: %s\nengineer: %s\ntaken_at: %s\nexpires_at: %s\n' \
             "$t" "$key" "$sess" "$ENGINEER" "$(now)" "$exp" > "$tmp"
@@ -1424,7 +1438,7 @@ cmd_lease() {
       need_me; ensure_identity
       lease_read "$track"
       if lease_is_free; then echo "LEASE=already-free"; return 0; fi
-      if [ "$L_SESSION" != "$sess" ]; then echo "NOT_YOURS=$track"; echo "HELD_BY=$L_SESSION"; exit 4; fi
+      if ! lease_is_mine "$L_HOLDER" "$sess"; then echo "NOT_YOURS=$track"; echo "HELD_BY=$L_SESSION"; echo "ITEM=$L_HOLDER"; exit 4; fi
       tmp="$(mktemp)"
       printf 'track: %s\nholder: none\nsession:\nengineer:\nlast_holder: %s (%s)\nreleased_at: %s\nexpires_at:\n' \
         "$track" "$L_HOLDER" "$sess" "$(now)" > "$tmp"

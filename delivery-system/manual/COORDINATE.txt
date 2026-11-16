@@ -1,0 +1,401 @@
+COORDINATE: WORKING AMONG HUNDREDS OF SESSIONS
+==============================================
+Part of the delivery manual, v0.3. Read DELIVERY-AGENT.txt first.
+
+The whole idea: the queue repo is the only place sessions can see each
+other. Every item has a branch there, claim/KEY, holding a small card that
+says who holds it and whether they are alive, plus the item's contract,
+proofs and journal. Every change to it is an ordinary push built on the
+latest version, so when two sessions try at once the server accepts one
+and refuses the other. Nothing is ever forced and nothing is ever deleted.
+
+dq does all of this. Use it; do not hand-edit the queue. "dq help" lists
+the commands. Each prints KEY=value lines you can rely on.
+
+Contents
+   1  Who you are                    8  Waiting for a free track
+   2  The card                       9  Waiting for a track run
+   3  Claim, save, release          10  Parking and questions
+   4  Taking over and handing over  11  Sharing one machine
+   5  Resuming on another machine   12  Checkpoints
+   6  Look around                   13  Requests to the harness team
+   7  Overlap and dependencies      14  Without the tool
+                                    15  Exit codes
+
+
+1. Who you are
+--------------
+
+A session id names the engineer, the machine and the session:
+
+    dana@ws-dana-2#a41f
+
+"dq claim" and "dq take" make one and print it as SESSION. Keep it for as
+long as you work on the item and pass it with -s on every command. It is
+how another session, or you on another machine, knows whether the item is
+in someone's hands right now.
+
+If you lose it (your context was compacted), do not guess. Run "dq whois
+KEY": if the active session is your own engineer's on this machine and it
+is truly you, take the item again with --replace-mine and a reason.
+
+
+2. The card
+-----------
+
+items/KEY/claim.yaml on branch claim/KEY. dq writes it. You set the scope
+fields through "dq beat --set"; leave the rest alone.
+
+  key, kind, epic       what the item is: story, bug, task, spike or epic
+  remit, tier
+  state                 Draft, Ready, Claimed, Local-proven, Track-proven,
+                        UAT-proven, Live, Confirmed, Regressed, or one of
+                        Satisfied, Cancelled, Decomposed
+  hold, hold_reason,    none, parked, waiting-track, waiting-results,
+  hold_since            waiting-approval, waiting-answer, challenge
+  engineer              who owns it
+  claimed_at            when it was first claimed
+  active_session,       who is working on it now, where, and since when.
+  active_machine,       Empty when nobody is.
+  active_since
+  heartbeat_at          the last time that session saved
+  active_seconds        time actually worked; the hours budget counts this
+  repos, services,      what it touches, so others can see collisions
+  flows                 coming
+  depends_on, blocks    links to other items
+  proofs_frozen,        the frozen proof list, who approved it, and a flag
+  proofs_approved_by,   if it changed afterwards
+  proofs_flag
+  previous_holders      who held it before a handover, and why
+
+A claim is a lock on the item. The active session is a second, smaller
+lock inside it: it says which one session may work on the item right now.
+
+
+3. Claim, save, release
+-----------------------
+
+Claim before anything else (rule 1):
+
+    dq claim KEY --kind story --epic EPIC --remit REMIT
+
+The claim starts at state Draft, which means "held, contract not yet
+agreed". It keeps other sessions off the ticket while you check whether it
+is already done, challenge it and draft the contract.
+
+Save often (rule 7):
+
+    dq beat KEY -s SESSION                saves the item's files, updates
+                                          the heartbeat, pushes
+    dq push KEY -s SESSION                pushes the item/KEY branches of
+                                          your worktrees, then beats
+
+Run "dq push" after every green commit and "dq beat" after every journal
+update, and at least every 30 minutes while you work or wait. A session
+that has not saved for coordination.session_stale_minutes (120 by default)
+is treated as gone, and can be replaced.
+
+What a beat tells you:
+
+  SAVED, AT, STATE, HOLD, ACTIVE_HOURS
+  MERGED_FROM_REMOTE=...   Someone committed to your item: an answer, an
+                           approval, pipeline results. The files are now
+                           in your local copy. Read them.
+  CONFLICTS=...            You and someone else changed the same file.
+                           Yours was kept and pushed; theirs is beside it
+                           as FILE.remote. Read both, reconcile, delete
+                           the .remote file, beat again.
+  PROOFS_FLAG=...          proofs.json changed in more than "passes"
+                           after the freeze. Get approval, freeze again.
+  BUDGET=...               A budget is spent. That is a stop condition.
+  NOT_ACTIVE=KEY           You are no longer the active session. Stop.
+
+Set the scope and links as you learn them:
+
+    dq beat KEY -s SESSION --set repos=a,b --set flows=refund
+    dq beat KEY -s SESSION --set depends_on=PAY-1390
+
+Move state only through dq, which checks the evidence first:
+
+    dq state KEY -s SESSION Local-proven
+
+Release when you stop working on the item, for any reason:
+
+    dq release KEY -s SESSION --hold parked --reason "why"
+
+Release keeps the claim and its engineer. It only clears the active
+session, so the next session can take it without waiting.
+
+
+4. Taking over and handing over
+-------------------------------
+
+    dq whois KEY        the card, how old the heartbeat is, and whether
+                        you may take the item
+
+    dq take KEY         become the active session
+
+Who may take what:
+
+- Your engineer's item, released: yes.
+- Your engineer's item, its session silent past the stale limit: yes.
+- Your engineer's item, its session still beating: only if that session is
+  truly gone (the machine was rebuilt, the terminal closed), and then:
+      dq take KEY --replace-mine "what happened to the other session"
+  If it is alive, the other session will be stopped at its next beat. Do
+  not use this to work on one item from two places.
+- Another engineer's item: only as a handover. That engineer or the remit
+  lead must agree first. Then, once the item is released or silent:
+      dq take KEY --from ENGINEER --reason "who agreed, and why"
+  The card records the previous holder and the reason.
+- Another engineer's item with a live session: never.
+
+Abandoned items. A claim with no active session and no heartbeat for
+coordination.claim_quiet_days is flagged on the board. The remit lead
+decides who takes it over. Do not take one on your own initiative.
+
+
+5. Resuming on another machine
+------------------------------
+
+Everything needed is in git, provided the last session saved (rule 7).
+
+1.  dq take KEY                       rebuilds the item's files here
+2.  dq work KEY <repo path> ...       checks out item/KEY from the remote
+3.  Read the journal from "Resume from".
+4.  Rebuild local state from the journal's "Rebuild local state": the
+    spotlight, the faker staging commands, the seed data.
+5.  dq check-proofs KEY --rung local  before writing any code
+
+This machine needs its own delivery.config.yaml. Setup is short the second
+time, because the shared environment file already holds most answers, and
+your engineer's other configs are published (dq configs).
+
+
+6. Look around
+--------------
+
+    dq look                  the summary, your items, the tracks, and
+                             open questions for your engineer
+    dq look --near KEY       items that share KEY's repos, services,
+                             flows or epic, or are linked by depends_on
+    dq look --all            every open item
+    dq look --prefix PAY-    only keys that start with PAY-
+    dq look --to "remit lead"    open questions addressed to a role
+    dq inbox                 only the open questions
+
+dq reads one generated file, the board, when the harness team's job
+publishes it. Until then it reads the claims directly, which is fine for
+tens of items and too slow for hundreds; it tells you which it did.
+
+Look at three moments: at the start of a session, right after claiming
+(step 1 of DELIVER.txt), and before a track run (step 13).
+
+What to report to the engineer from it:
+
+- Items under NEAR, each with its WHY: same-repo, same-service,
+  same-flow, same-epic, you-depend-on-it, it-depends-on-you.
+- SILENT_SESSIONS among your engineer's own items: they may need
+  replacing.
+- FLAGGED_PROOFS, if your engineer is a remit lead.
+- Whether a track is free, and how many items are waiting for one.
+
+
+7. Overlap and dependencies
+---------------------------
+
+Two items that change the same files or the same flow collide when they
+are integrated. Find out before a track run, not after.
+
+    dq overlap KEY <worktree>      files that your item/KEY branch and any
+                                   other unmerged item branch both change
+
+When there is overlap, or "dq look --near" shows same-flow:
+
+1. Read the other item's contract and the top of its journal:
+       git -C <queue> fetch origin claim/OTHER
+       git -C <queue> show FETCH_HEAD:items/OTHER/contract.yaml
+2. Decide the order with its owner. Ask with an escalation in your own
+   item, addressed to them:
+       dq new KEY escalation --to "ENGINEER (owner of OTHER)"
+3. Record the link on your card. They record theirs.
+       dq beat KEY -s SESSION --set depends_on=OTHER      you go second
+       dq beat KEY -s SESSION --set blocks=OTHER          you go first
+4. The one who goes second merges the other's work in (step 13 of
+   DELIVER.txt) after it lands, and re-proves.
+
+Never edit another item's files. Their card, contract and journal are
+theirs.
+
+
+8. Waiting for a free track
+---------------------------
+
+    dq lease list                          every track, who holds it,
+                                           until when, and who is waiting
+    dq lease take any KEY -s SESSION       take the first free track
+    dq lease release TRACK -s SESSION      give it back
+
+A lease is a branch per track, lease/TRACK, that is never deleted. Taking
+and releasing are ordinary pushes, so two sessions cannot both get the
+same track. A lease expires after tracks.lease_minutes; an expired lease
+can be taken by anyone. The active session of the item that holds a track
+can release or renew it, whichever session took it.
+
+When none is free:
+
+1.  dq beat KEY -s SESSION --hold waiting-track --reason "no free track"
+    This puts you on the waiting list everyone can see.
+2.  Decide from "dq lease list" whether the wait is short. While you
+    wait, do rung 1 work that belongs to this item: more proofs, the
+    summary, the Atlas proposals. Look again every tracks.poll_minutes,
+    with a beat each time.
+3.  When a track frees up and nobody has waited longer than you, take it
+    and clear the hold:
+        dq beat KEY -s SESSION --hold none
+    If others have waited longer, let them go first.
+4.  Still waiting after tracks.park_after_minutes: release the item with
+    the hold in place. A later session picks it up when a track is free.
+
+Where a person hands out tracks (tracks.lease_method is "assigned"), dq
+says so. Ask the engineer or the track coordinator with an escalation, set
+the same hold, and write the track you are given in the journal.
+
+
+9. Waiting for a track run
+--------------------------
+
+After you trigger a deploy, the result arrives at tracks.results_path.
+
+- Look for it every tracks.poll_minutes (5 by default): fetch the results
+  path, then "dq beat".
+- Meanwhile, do only work that belongs to this item and does not change
+  its code: draft the summary and the Jira update, write the Atlas
+  proposals, extend the verification skill, tidy the journal. A code
+  change now would mean the run proved something else.
+- Do not start another item in this session.
+- After tracks.park_after_minutes (30) with no result, stop waiting in
+  the session. Write the run's start time, track and commits under
+  "Resume from", then:
+      dq release KEY -s SESSION --hold waiting-results --reason "run started HH:MM on TRACK"
+  Any later session takes the item, finds the results and carries on from
+  step 14d of DELIVER.txt.
+- No result after tracks.result_timeout_minutes (120) from the start of
+  the run is a stop condition. The pipeline may be stuck. Release the
+  track so others are not blocked, tell the engineer, and file a harness
+  request.
+
+
+10. Parking and questions
+-------------------------
+
+To park an item (a stop condition, a question, an approval):
+
+1. Code: reset to the last green commit, or commit work in progress
+   clearly marked as such. Push.
+2. Journal: where you are, what you tried, the options, and "Resume from".
+3. One question, to one person, with your recommendation:
+       dq new KEY escalation --to "remit lead NAME"
+4. If that person is in the session, ask them there as well.
+5. Release with the hold that fits:
+       dq release KEY -s SESSION --hold waiting-answer --reason "..."
+   parked for a stop condition, waiting-answer for a question,
+   waiting-approval for a proof or review approval, challenge for a
+   challenge to product.
+
+Who to address: the engineer for scope, environment and priority; the
+remit lead for what good looks like and for frozen proofs; product for
+intent and challenges; another item's owner for order and overlap.
+
+Answers. The person asked writes under "Answer:" in the file and commits
+it to the claim branch, in the web editor or from a clone. The next "dq
+take" or "dq beat" brings it into the local copy and says so. Open
+questions show on the board until they have an answer.
+
+If your engineer dictates an answer to a question in another item, you may
+commit exactly their words under "Answer:" in that file, and change
+nothing else there.
+
+
+11. Sharing one machine
+-----------------------
+
+Several sessions of one engineer often share a workspace.
+
+- Code. Work in the item's own worktrees (dq work KEY ...), never in the
+  main checkouts, so two sessions cannot overwrite each other.
+- The spotlight. A workspace runs one at a time. Take it before starting
+  it and release it after stopping it:
+      dq spot take KEY -s SESSION
+      dq spot release -s SESSION
+      dq spot status
+  Busy: do work that does not need it, then try again. Never start a
+  second spotlight; it will take the first one down with it.
+- The item's files. Each item has its own directory, and only its active
+  session writes there.
+
+
+12. Checkpoints
+---------------
+
+A long run outlives a context window, and sometimes a machine.
+
+- At every state change, every ten attempts, and at least hourly: update
+  "Resume from" in the journal, then "dq beat".
+- Timestamps go on every journal line. Elapsed time is measured from
+  them, and dq counts worked time from the heartbeats.
+- After your context has been compacted, or after three hours in one
+  session: finish the current attempt, checkpoint, "dq release", and tell
+  the engineer to start a fresh session.
+- When install has added the hooks, a session is not allowed to end a
+  turn with unsaved item files, with unpushed commits in the item's
+  worktrees, or with a proof marked passing that has no evidence. The
+  message names the command that fixes it.
+
+
+13. Requests to the harness team
+--------------------------------
+
+When something you need does not exist, say so where the people who can
+build it will see it:
+
+    cp <system>/templates/request.md /tmp/request.md      fill it in
+    dq request refund-spotlight /tmp/request.md
+
+It appears on the board under requests. Say in your report what stays
+unproven until it is closed, and carry on with what you can do.
+
+
+14. Without the tool
+--------------------
+
+If dq cannot run, the same protocol by hand, in a separate clone of the
+queue so you do not disturb the shared checkout:
+
+  Claim     Branch claim/KEY from the default branch. Add
+            items/KEY/claim.yaml with the fields in section 2. Commit.
+            "git push origin claim/KEY". A rejection means it is taken.
+  Save      Update heartbeat_at, commit, push. Never force. A rejection
+            means someone else pushed: fetch, merge, check that
+            active_session is still yours, push again.
+  Release   Clear active_session, active_machine and active_since. Commit
+            and push.
+  Take      Fetch claim/KEY. Check the rules in section 4. Write your
+            session into the card. Commit and push; a rejection means
+            someone else got there first.
+  Lease     Branch lease/TRACK holds one file, lease.yaml: track, holder,
+            session, engineer, taken_at, expires_at. Same push rule.
+
+Tell the engineer that dq is not working, and file a harness request.
+
+
+15. Exit codes
+--------------
+
+  0  done
+  1  an error, or a command used wrongly
+  3  held by someone else: a claim, a session, a track, the spotlight
+  4  you are not the active session, or not the holder
+  5  not available in this environment
+  6  evidence is missing, so the state was not changed
+  7  needs your attention before going on

@@ -339,6 +339,15 @@ n="$(cat "$T/lr1.out" "$T/lr2.out" | grep -c '^LEASE=track-01$')"
 if [ "$n" = 1 ]; then ok "two sessions racing for one track: exactly one wins"; else bad "lease race produced $n winners" "$(cat "$T/lr1.out" "$T/lr2.out")"; fi
 OUT="$(git -C "$T/server/queue.git" for-each-ref --format='%(refname)' refs/heads/lease/)"
 want_out "lease branches persist; nothing is deleted" 'refs/heads/lease/track-01'
+run dq_m m3 lease release track-02 -s "$S4"
+run dq_m m1 claim PAY-10;           S10="$(val SESSION)"
+run dq_m m1 lease take track-02 PAY-10 -s "$S10"; want_out "an item leases a track for a run" '^LEASE=track-02$'
+run dq_m m1 release PAY-10 -s "$S10" --hold waiting-results --reason "run in flight on track-02"
+want_rc "a session can park while a run is in flight" 0
+run dq_m m2 take PAY-10;            S10B="$(val SESSION)"
+run dq_m m3 lease release track-02 -s "$S4";    want_rc "a stranger cannot release the item's track" 4
+run dq_m m2 lease release track-02 -s "$S10B";  want_rc "the item's next session can release its track" 0
+run dq_m m2 beat PAY-10 -s "$S10B" --hold bogus; want_rc "an unknown hold is refused" 1
 run dq_m m4 claim PAY-6;            S6="$(val SESSION)"
 run dq_m m4 lease take any PAY-6 -s "$S6"; want_rc "where a person assigns tracks, dq says so" 5
 run dq_m m4 beat PAY-6 -s "$S6" --hold waiting-track --reason "no free track"

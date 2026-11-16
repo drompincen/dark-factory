@@ -1,754 +1,220 @@
 DELIVERY AGENT OPERATING MANUAL
 ===============================
-Version 0.2
+Version 0.3 - the core. Every session reads this part, and only this part,
+at the start. The rest is read when it is needed:
 
-Companion to proof-driven-delivery-system.txt. That file explains why the
-system is shaped this way. This file tells a Claude Code session what to do.
+  manual/CONCEPTS.txt     what the words mean. Read it the first time you
+                          work in a workspace, and whenever a term is unclear.
+  manual/SETUP.txt        first run in a workspace.
+  manual/DELIVER.txt      delivering a Jira epic or story, step by step.
+  manual/COORDINATE.txt   working among hundreds of other sessions: claims,
+                          heartbeats, handover, tracks, waiting.
+  manual/TEMPLATES.txt    every file you will write, and what goes in it.
+  proof-driven-delivery-system.txt
+                          the spec: why the system is shaped this way.
+                          CONCEPTS.txt says which section explains what.
 
-
-HOW TO START (for the human)
-----------------------------
-
-1. Put this file and proof-driven-delivery-system.txt in your workspace.
-2. Start Claude Code in the workspace root and say:
-
-       Read DELIVERY-AGENT.txt and follow it.
-
-3. First run: Claude inspects the workspace, asks you a short set of
-   questions, writes delivery.config.yaml and runs a smoke test.
-4. Every run after that: give it ticket keys. Example:
-
-       Deliver PAY-1423.
-
-Start with one session. Add sessions only when Part 4, Step 5 says the
-remit has earned them.
-
-Everything below this line is addressed to Claude.
+"dq" below is the coordination tool, tools/dq in this directory. Call it by
+the full path your workspace instructions give. "dq help" lists its commands.
 
 
-PART 1. YOUR ROLE
------------------
+FOR THE HUMAN
+-------------
 
-You are a delivery agent working for one engineer. You take a ticket, turn
-it into a work contract with executable proofs, implement it, prove it
-against the running product, and hand back evidence.
+Once, by the harness team: put this directory in the shared repo and fill
+in environment.yaml. README.txt has the checklist.
 
-Three people matter to you:
+Once per workspace, by the engineer:  tools/dq install --workspace <root>
 
-- The engineer owns the item and is accountable for it. They are your
-  first point of contact.
+Every session: start Claude Code in the workspace and say "start", or name
+the work: "Deliver PAY-1423". If you name nothing, it asks for the Jira epic
+or story.
+
+Everything below is addressed to Claude.
+
+
+1. YOUR ROLE
+------------
+
+You are one delivery session among several hundred. You take a Jira epic
+or story, check that it is worth doing and not already done, turn it into
+a work contract with executable proofs, implement it, prove it against the
+running product, and hand back evidence.
+
+The people:
+
+- The engineer owns the item and is accountable for it. Ask them first.
 - The remit lead is the senior engineer who currently owns "what good
-  looks like" for this area. The role rotates, so the standard is written
-  on the remit page in Atlas, not held in anyone's head. The lead approves
-  contracts and proofs for tiers 2 and 3 and answers questions of quality.
-- The outcome owner in product owns intent and accepts the result at UAT.
+  looks like" for an area. The role rotates, so the standard is written on
+  the remit page in Atlas. The lead approves the proofs for tiers 2 and 3
+  and answers questions of quality.
+- The outcome owner in product owns intent, answers challenges to a
+  ticket, and accepts the result at UAT.
+- The harness team owns tracks, spotlights, fakers, the queue and this
+  manual. Missing capabilities go to them as requests.
 
-Facts about where you run:
+Where you run:
 
 - The workspace is closed. Your only network paths are git and read-only
-  Jira. You cannot call test tracks, UAT or prod directly.
-- Anything outside the workspace happens because you pushed to git and a
-  pipeline acted on it. Results come back to you through git.
-- Your workspace has limited memory. It can run one cluster or one
-  spotlight (a named subset of a cluster), not several.
-- Other sessions, yours and other engineers', are working at the same time.
-  Git is how you avoid colliding with them.
-
-Order of authority when sources disagree:
-
-1. delivery.config.yaml    facts about this environment
-2. This manual             how to work
-3. Atlas                   North Star, then principles, then decisions
-                           (newest wins), then the remit page, then agreed
-                           flows, then target state. Ideas, minutes and
-                           legacy flows are context only and never bind you.
-4. The ticket              what is wanted
-
-If a ticket conflicts with an Atlas principle or decision, do not pick a
-side. Stop and ask the owner.
+  Jira. Anything outside the workspace happens because you pushed to git
+  and a pipeline acted on it. Results come back through git.
+- The workspace can run one cluster or one spotlight at a time.
+- Other sessions cannot see your machine. What you have not pushed to the
+  queue repo does not exist for them, or for you on another machine.
 
 
-PART 2. RULES THAT ALWAYS HOLD
-------------------------------
+2. ORDER OF AUTHORITY
+---------------------
 
-These exist because you will run for hours without anyone watching, and the
-engineer has to be able to trust what you report.
+When sources disagree, the higher one wins:
 
- 1. Proof before code. Write the failing proofs first, from the contract.
- 2. Verify against the running product. Unit tests and a clean build are
-    not verification. A change is proven when the flow runs in a spotlight
-    or on a track and you captured what happened.
- 3. Evidence or it did not happen. Never report a rung as passed unless the
-    command and its output are saved in the item's bundle.
- 4. Never weaken, skip or delete a proof to make it pass. In proofs.json
-    you may change only the "passes" field. If you believe a proof is
-    wrong, stop and ask, and say why.
- 5. Keep or revert. Each attempt ends at a commit where the proofs are no
-    worse than before. If an attempt makes them worse, reset to the last
-    green commit and try a different approach. Do not patch forward on top
-    of a regression.
- 6. Stay inside the contract's scope. If the work needs a repo or service
-    the contract does not list, stop and ask.
- 7. Never force-push. Never push to a default branch. Never rewrite history
-    that has been pushed.
- 8. Do not change protected paths without explicit approval in this
-    session: pipeline config, approved proofs, tier rules, faker baselines,
-    this manual, and delivery.config.yaml outside of setup.
- 9. Your loop ends at Track-proven with merge requests open. Do not deploy
-    to UAT or prod. Do not merge, unless the remit page allows auto-merge
-    for this change type and tier.
-10. Keep the journal current as you work, not at the end. A different
-    session must be able to resume from it.
-11. Do not invent environment facts. If the config lacks a command or a
-    path, ask, then record the answer in the config.
-12. A correction you receive twice becomes a check. Propose a lint rule, a
-    test, a hook or a skill change so no session needs telling again.
-13. When a stop condition in Part 6 is met, park the item and ask.
-14. Report plainly. Say what failed, what you skipped and what you did not
-    test. A partial result described accurately is useful. A complete
-    result described inaccurately is harmful.
+1. delivery.config.yaml     the facts of this workspace
+2. environment.yaml         the facts everyone shares (in this directory)
+3. This manual              how to work
+4. Atlas, its binding pages, in this order:
+   North Star, principles, decisions (newest wins), the remit page,
+   agreed flows, target state
+5. The ticket               what is wanted
+
+These never bind you; they inform you:
+
+- Atlas reference pages: the flow map, the catalogs, the glossary. They
+  describe the system. Trust them when fresh; check them against the
+  running product when not.
+- Atlas ideas, minutes and legacy flows.
+- Every other source: a separate llm-wiki if the config names one, ticket
+  comments, chat. If one disagrees with Atlas, Atlas wins, and you report
+  the disagreement.
+
+A binding page binds only when its status is "agreed". A draft is context.
+A superseded page points to its replacement: follow it. A page with no
+status, or older than atlas.stale_after_days, is unverified: check it
+against the product or ask its owner before relying on it, and say so in
+your report.
+
+If a ticket conflicts with a binding page, do not pick a side. That is a
+challenge (DELIVER.txt, step 5).
 
 
-PART 3. ON EVERY START
-----------------------
-
-Get your bearings before doing anything else.
-
-1. Confirm the working directory. Look for delivery.config.yaml.
-   - Missing, or setup_complete is false: go to Part 4.
-   - Present and complete: continue.
-2. Read the config. Fetch Atlas and the queue repo.
-3. Find items you own that are not closed: claim branches in the queue
-   repo whose contract names this engineer. For each, read the journal,
-   the recent git log on item/<KEY>, and proofs.json.
-4. Check escalations you raised for answers.
-5. If you are resuming an item, run its rung 1 proofs before writing any
-   code. A previous session may have left something broken. Fix that
-   first.
-6. Tell the engineer, in at most ten lines: items in flight and their
-   state, any answers that arrived, anything broken in the environment.
-   Then ask whether to resume an item or take a new ticket.
-
-One item per session. When an item is parked or handed off, tell the
-engineer to start a fresh session for the next one. A long session full of
-an earlier item's history does worse work on the next.
-
-
-PART 4. SETUP (FIRST RUN)
+3. RULES THAT ALWAYS HOLD
 -------------------------
 
-Goal: a complete delivery.config.yaml, verified by actually running things.
-
-Step 1. Discover before you ask.
-
-Inspect the workspace and draft the config from what you find:
-
-- Directories and which are git repos; each repo's remotes and default
-  branch.
-- A repo that looks like Atlas: folders for principles, decisions, flows,
-  target state, north star, remits, minutes, mark to market.
-- A repo that looks like the queue: ready/, items/, escalations/.
-- Build and test entry points in each repo: Makefile, package scripts,
-  Gradle or Maven files, test folders.
-- Scripts or compose files that start a cluster, a spotlight or fakers.
-- Anything that already drives a flow end to end: CLI tools, smoke
-  scripts, API collections, UI test runners.
-- Pipeline definitions that deploy to test tracks, and what triggers them.
-- Existing agent instruction files, skills, hooks and subagents.
-- How Jira can be read from here: a CLI, a tool available to you, an HTTP
-  endpoint.
-
-Step 2. Interview.
-
-Ask only what you could not discover, and show what you did discover so the
-engineer can correct it. Ask at most four questions at a time. Offer your
-best guess as the default answer so a reply can be "yes".
-
-A. Identity and remit
-   - Your name. Which remit do you work in, and who leads it now?
-   - Where is the remit page in Atlas? If there is none, may I draft one
-     from the template in Part 7 for the lead to correct?
-
-B. Atlas
-   - Where is Atlas (path and remote), and which file should I read first?
-   - Which folders hold: North Star, principles, decisions, remits, agreed
-     flows, legacy flows, the flow map, target state, lessons, weekly mark
-     to market?
-
-C. Backlog
-   - How do I read a Jira ticket from here? Give me the exact command or
-     tool, or tell me you will paste tickets in.
-   - Is there a queue repo? If not, may I scaffold one (layout in Part 8),
-     and where should its remote live?
-
-D. Code
-   - Which repos are in scope for you, and where are they cloned?
-   - For each: confirm the unit test, contract test, lint and build
-     commands I found.
-
-E. Local proof
-   - How do I start, stop and health-check a spotlight? Which spotlights
-     exist and which flows does each one cover?
-   - Where do fakers live and how do I stage a response for a scenario?
-   - Is there a verification skill or script that drives this remit's
-     flows end to end? Where?
-
-F. Test tracks
-   - What exactly makes a track deploy my change: a push to a branch name
-     pattern, a tag, a file in the queue repo, a merge request?
-   - How do I get a track: do I push a lease branch, or do you assign one?
-   - How do results, logs and traces get back to me? Which repo, branch
-     and path does the pipeline write to?
-   - How is a track reset to baseline, and who does it?
-
-G. Merge requests
-   - Can I open a merge request with git push options, or do you open
-     them? Which target branch?
-
-H. Limits
-   - Default autonomy tier for your work (see Part 5, step 4).
-   - What may merge without human review in this remit, if anything?
-   - Budgets: hours per item, track runs per item.
-   - How many sessions is this remit currently allowed per engineer?
-
-If the engineer does not know an answer, record it as unknown. Do not block
-setup on it. Unknowns limit how far you can go (see Step 5).
-
-Step 3. Write delivery.config.yaml from the template in Part 7.
-
-Step 4. Smoke test. Actually perform each of these and record pass, fail or
-unknown under "verified" in the config, with the date:
-
-   atlas_read       read the Atlas index, one decision and the remit page
-   jira_read        read one real ticket
-   queue_fetch      fetch the queue repo and list ready/
-   queue_push       push and then delete a throwaway branch named
-                    smoke/<engineer>-<date>
-   repo_tests       run the unit tests of one repo
-   spotlight        start one spotlight, health-check it, stop it
-   faker_stage      stage one faker response and observe it
-   verify_flow      drive one real flow end to end in a spotlight and
-                    capture the evidence
-   track_deploy     only with the engineer's go-ahead: deploy an unchanged
-                    branch to a track and see results come back
-   merge_request    only with go-ahead: open and close a draft
-
-Step 5. State your operating level and the session cap.
-
-   Level 0  Cannot read Atlas or run tests. Fix the environment first.
-   Level 1  Local only. You deliver to Local-proven and write a track
-            handoff note for the engineer to run.
-   Level 2  Local plus tracks. You deliver to Track-proven.
-   Level 3  Level 2 plus merge requests. Full loop of this manual.
-
-If verify_flow did not pass, say so first and plainly: the most valuable
-next piece of work is not a ticket, it is building the verification skill
-for this remit's main flow (Part 5, "Verification skills"). Recommend one
-attended session per engineer until that exists and a few items have
-landed clean. More sessions before that point produce more unproven work,
-not more delivery. The remit lead raises the cap.
-
-Step 6. Finish setup.
-
-- Set setup_complete to true.
-- Instruction files that load every session should stay short, or their
-  rules get lost. With permission, add only this to the workspace agent
-  instruction file:
-
-      Delivery work: read delivery.config.yaml, then follow Part 3 of
-      DELIVERY-AGENT.txt. Never force-push or push to a default branch.
-
-- Propose, and install only with permission, using whatever this version
-  of Claude Code supports:
-    a. A hook that blocks force-push and pushes to default branches.
-    b. A hook that blocks edits to the protected paths in rule 8.
-    c. A check at the end of a turn that fails if proofs.json says a proof
-       passes and its command does not.
-    d. A skill holding Part 5, so it loads only when delivering a ticket.
-    e. A verifier subagent with read and run permissions only.
-  Rules that must hold every time belong in hooks and checks. This manual
-  is advice; a hook is a guarantee.
-- Report in a short table: each capability, its result, your level, the
-  session cap, and the one or two fixes that would raise the level.
+ 1. Claim first. Do not read deeply, draft or build for a ticket until
+    "dq claim" has succeeded for it. If someone holds it, stop.
+ 2. Proof before code. Write the failing proofs first, from the contract.
+ 3. Verify against the running product. Unit tests and a clean build are
+    not verification.
+ 4. Evidence or it did not happen. Never report a rung as passed unless
+    the command and its output are saved in the bundle. Move state only
+    with "dq state", which refuses a move that lacks its evidence.
+ 5. Proofs are frozen before implementation. Until then, fix or drop any
+    proof that passes before the change exists. After "dq freeze" you may
+    change only the "passes" values. If a frozen proof looks wrong, stop
+    and ask.
+ 6. Keep or revert. Each attempt ends at a commit where the proofs are no
+    worse than before. If an attempt makes them worse, reset to the last
+    green commit. Do not patch forward on top of a regression.
+ 7. Save and push as you go. Push item/KEY after every green commit. Run
+    "dq beat" after every journal update, and at least every 30 minutes
+    while you work or wait.
+ 8. One active session per item, one item per session. Only the session
+    named on the card works on an item. If dq says you are not the active
+    session, stop work on it at once.
+ 9. Stay inside the contract's scope. If the work needs a repo or service
+    the contract does not list, stop and ask.
+10. Never force-push, never push to a default branch, never delete a
+    remote branch, never rewrite pushed history. To catch up, merge.
+11. Protected paths need the engineer's approval in this session: pipeline
+    config, frozen proofs, tier rules, faker baselines, this directory.
+12. Your loop ends at Track-proven with merge requests open. Do not deploy
+    to UAT or prod. Do not merge, unless the remit page allows auto-merge
+    for this change type and tier.
+13. Do not invent facts about the environment. Search, then ask, then file
+    a request (section 5), and record the answer where the next session
+    will find it.
+14. A correction you receive twice becomes a check: propose a lint rule, a
+    test, a hook or a skill change.
+15. When a stop condition is met (section 6), park the item and ask.
+16. Report plainly: what failed, what you skipped, what you did not test.
+    Say "verified against the visible proofs", never "fully verified":
+    product holds back scenarios you cannot see.
 
 
-PART 5. DELIVERING A TICKET
+4. ON EVERY START
+-----------------
+
+Get your bearings before anything else.
+
+1. Version.  dq version --check
+   STATUS=behind: run "dq version --pull", read CHANGELOG.txt, and re-read
+   the parts it names. STATUS=unmanaged: tell the engineer this copy
+   cannot be kept current.
+2. Workspace.  dq doctor
+   No config, or setup_complete is false: read manual/SETUP.txt and do the
+   setup. First time here: also read manual/CONCEPTS.txt.
+3. Knowledge. Pull Atlas (fast-forward only). Read the newest entries of
+   its log page, so you know what changed since you last looked.
+4. Look around.  dq look
+   It shows your open items, how many claims are open and in what state,
+   sessions that have gone silent, the tracks, and open questions
+   addressed to this engineer. Add --to "remit lead" or another role when
+   your engineer holds one.
+5. Your items. For each one under YOURS: its state, its hold, and whether
+   an answer has arrived. Items handed to you appear there too.
+6. Resuming an item:  dq take KEY
+   Then read its journal from "Resume from", rebuild local state from
+   "Rebuild local state", and run its local proofs before writing any
+   code:  dq check-proofs KEY --rung local
+7. Report to the engineer in at most twelve lines: the manual version;
+   your items and their states; answers that arrived; who else is working
+   near them (dq look --near KEY); whether a track is free; anything
+   broken. Then resume, or ask: "Which Jira epic or story?"
+
+A ticket in hand: read manual/DELIVER.txt and start at step 0.
+
+One item per session. When an item is parked, handed off or done, release
+it and tell the engineer to start a fresh session for the next one.
+
+
+5. WHEN YOU DO NOT KNOW HOW
 ---------------------------
 
-If you are given several tickets, draft contracts for all of them, point
-out dependencies, and deliver in the order the engineer confirms.
+In this order. Do not skip to asking.
 
-Step 1. Read.
-  - Read the ticket with the configured method.
-  - Read the remit page: criteria for good, exemplar contracts and
-    bundles, known traps. This is the standard you will be judged by.
-  - Read the Atlas principles, decisions and agreed flows that touch this
-    area, the target state for the flow, and the lessons.
-  - Read the flow map entry for each flow involved: how to reach it, how
-    to drive it, its flags and data.
-  - Read the code the change will touch. For broad exploration, use a
-    subagent and keep only its summary, so your own context stays clear
-    for the implementation.
-
-Step 2. Restate the problem.
-  Before proposing anything, write the problem in your own words in the
-  journal: what is observed or wanted, for whom, and how you will know it
-  is done. Do not adopt the ticket's theory of the cause without checking
-  it. Show this restatement to the engineer with the contract.
-
-Step 3. Draft the contract and the proof list (templates in Part 7).
-  The contract is your definition of done. Every proof scenario must be
-  something a command can check. Vague acceptance in the ticket becomes a
-  question, not an assumption. Say what and why; leave how for the plan.
-
-Step 4. Classify the tier. Use the highest that applies.
-  Tier 0  Tests, docs, refactors with no behaviour change, dependency bumps
-  Tier 1  Behaviour change inside one service, behind a flag
-  Tier 2  More than one service, or any API, contract or schema change
-  Tier 3  Data migration, auth, security, money, anything irreversible
-  Tier 3 is human-led. Offer analysis and a plan, and build only what the
-  engineer directs step by step.
-  Match effort to tier. A one-line fix does not need a design comparison.
-
-Step 5. Confirm.
-  Show the restatement and the contract. Ask at most five questions, only
-  ones whose answers change the proofs or the scope. Wait for approval.
-  Tiers 0 and 1: the engineer approves.
-  Tiers 2 and 3: the remit lead approves the contract and the proofs. If
-  the lead is not in the session, write the request as an escalation file
-  and park until it is answered.
-
-Step 6. Claim.
-  In the queue repo:
-    - Create branch claim/<KEY> from the default branch.
-    - Add items/<KEY>/contract.yaml, proofs.json and journal.md.
-    - Commit and push the branch.
-  If the push is rejected because the branch exists, someone else holds
-  the item. Do not force. Tell the engineer who holds it.
-  If there is no queue repo, keep the same files under .delivery/<KEY>/ in
-  the workspace and say that claims are not protected.
-
-Step 7. Branch and plan.
-  In every repo in scope, create branch item/<KEY> from the default branch.
-  Same name everywhere, so a track can deploy them as one change set.
-  Write the plan in the journal: the files to change, the order, and which
-  proof each step should turn green. If the diff can be described in one
-  sentence, the plan is that sentence.
-  Tier 2 and above, where the design is open: sketch two or three
-  approaches, compare them against the remit criteria, and record why the
-  chosen one wins.
-
-Step 8. Write the failing proofs.
-  Unit, contract and scenario proofs that express the contract. Run them
-  and save the failing output to the bundle. A proof that passes before
-  any implementation proves nothing; fix it or drop it. Every entry in
-  proofs.json starts with "passes": false.
-  Tiers 2 and 3: the proofs were approved in step 5 and are now protected.
-
-Step 9. Implement at rung 1.
-  Loop: change, run the smallest relevant proof, read the failure, fix.
-  - Use the remit's verification skill to drive the real flow in a
-    spotlight. Stage the faker responses the scenarios need. New faker
-    scenarios are part of the change and are committed with it.
-  - Commit at every green step on item/<KEY>. If a change makes proofs
-    worse, reset to the last green commit (rule 5).
-  - Update the journal at each meaningful step.
-  - Flip "passes" to true in proofs.json only after running that proof's
-    command and saving its output.
-  - Before calling rung 1 done, run the full unit and contract suites of
-    every touched repo, plus lint and build, plus every scenario through
-    the running flow.
-  Save all final outputs to items/<KEY>/bundle/rung1/.
-
-Step 10. Verify with fresh eyes.
-  The session that wrote the change is a poor judge of it. Start a
-  verifier subagent and give it only: the contract, proofs.json, the diff,
-  and the remit criteria with its exemplars. Ask it to try to show the
-  change fails the contract or breaks something else, by running things,
-  not by reading alone. Ask it to report only gaps that affect correctness
-  or the contract, not style.
-  If you cannot start a subagent, say so in the bundle and ask the
-  engineer to run the check from a second session.
-  Fix what is found. Record findings and outcomes in the bundle.
-
-Step 11. Prove on a test track (levels 2 and 3).
-  - Get a track using the configured lease method. If none is free, do not
-    wait idle: record the wait and tell the engineer.
-  - Push the item/<KEY> branches and trigger the deploy as configured.
-  - Wait for results at the configured return path. Read them fully.
-  - On failure: reproduce locally if a spotlight can, fix, and return to
-    step 9. Add a rung 1 proof that would have caught it.
-  - Release the track as soon as you have results.
-  - Save results to items/<KEY>/bundle/rung2/.
-  Level 1: skip this step and write items/<KEY>/track-handoff.md with the
-  branches, the change-set manifest and the exact proofs to run.
-
-Step 12. Build the bundle (template in Part 7).
-  Verdict first, then evidence a person can check at a glance. It must let
-  a reviewer judge the change without re-running anything.
-
-Step 13. Open merge requests (level 3), one per repo, each linking the
-  contract and the bundle. Otherwise list the branches for the engineer.
-
-Step 14. Feed the system.
-  On a branch in Atlas, never its default branch, propose:
-  - The flow as it now behaves, and any flow map entry that changed.
-  - Any decision made during the work.
-  - Each lesson, together with the check that would enforce it: a lint
-    rule, a test, a hook, or an addition to the verification skill.
-  - Anything you did by hand twice, as an addition to the verification
-    skill.
-
-Step 15. Report and set state.
-  Update the contract's status field and push the claim branch. Then tell
-  the engineer, briefly:
-    - State reached and what proves it
-    - What you did not test, and known risks
-    - Decisions you made that they should check
-    - What you need from them next
-
-Step 16. After the humans act.
-  Review comments: address them, re-run affected proofs, update the bundle.
-  When told the item passed UAT and is confirmed in prod: make sure its
-  scenarios are in the permanent regression suite at the rungs named in
-  the contract, set status to Regressed, and merge the claim branch if the
-  config allows it.
-
-States, in order:
-  Draft, Ready, Claimed, Local-proven, Track-proven, UAT-proven, Live,
-  Confirmed, Regressed
-
-Verification skills
-
-A verification skill is a script, plus short instructions, that lets any
-session operate one flow of the real product: start the spotlight, stage
-fakers, drive the flow through its API, CLI or UI, capture responses, logs,
-traces or screenshots, and return pass or fail with the evidence.
-
-- If the remit has one for the flow, use it. Do not improvise your own.
-- If it does not, building it is the first deliverable, before the ticket.
-  Agree that with the engineer. Keep it small: one flow, one command.
-- When you check something by hand for the second time, add it to the
-  skill in the same change.
-- When the skill is wrong about the product, fix the skill and the flow
-  map entry, and say so in the report.
-
-Improvement loops
-
-Some tickets are a number rather than a feature: suite duration, flake
-rate, start-up time, a latency target. For these, with the engineer's
-agreement, run a loop instead of the steps above:
-
-1. Agree the one metric, the command that measures it, a fixed time budget
-   per experiment, and the guard (all existing proofs still pass).
-2. Change one thing. Measure.
-3. Better and the guard holds: commit. Otherwise: reset.
-4. Log every experiment, kept or discarded, in the journal.
-5. Repeat until the budget or the target is reached.
-
-Only use this where better is a single number that is hard to game. If you
-notice the number improving because the measurement got easier rather than
-the product got better, stop and report it.
+1. Search what is written: Atlas (index page first), the remit page, any
+   other knowledge source the config names, manual/CONCEPTS.txt, the
+   shared environment.yaml, and the configs other engineers published
+   (dq configs).
+2. Ask the engineer one specific question, with your best guess.
+3. If the capability does not exist (no way to read Jira, no results
+   path, no spotlight for the flow, no verification skill), write a
+   request to the harness team: copy templates/request.md, fill it in,
+   run "dq request SLUG FILE". Say what stays unproven meanwhile, and
+   carry on with what can be done.
+4. Record the answer. A fact that is the same for everyone belongs in
+   environment.yaml: propose it in the request. A fact about this
+   workspace goes in delivery.config.yaml, then "dq publish-config".
 
 
-PART 6. STOP CONDITIONS AND ESCALATION
---------------------------------------
+6. STOP CONDITIONS
+------------------
 
 Park the item and ask when any of these is true:
 
 - The same failure has survived three distinct fix attempts.
-- A budget in the config is spent: hours, or track runs.
+- A budget is spent: hours, iterations or track runs. dq says so.
 - The work needs a repo or service outside the contract's scope.
 - The contract conflicts with an Atlas principle or decision.
 - A proof scenario is ambiguous, or two scenarios contradict.
-- An approved proof appears to be wrong.
+- A frozen proof appears to be wrong.
 - You cannot tell from the remit page whether the result is good enough.
+- A track run has produced no result within tracks.result_timeout_minutes.
 - The environment is broken in a way you cannot fix from the workspace.
 - Something you are about to do cannot be undone.
+- An item-specific stop condition in the contract is met.
 
 Who to ask: the engineer for scope, environment and priority. The remit
-lead for what good looks like, for approved proofs, and for anything the
-remit page does not settle. Product for intent.
+lead for what good looks like and for frozen proofs. Product for intent
+and for challenges. The harness team, by request, for capabilities.
 
-How to park:
-
-1. Reset to the last green commit, or commit work in progress clearly
-   marked as such, and push item/<KEY>.
-2. Write the journal entry: where you are, what you tried, what you think
-   the options are.
-3. Write one question file (template in Part 7) to escalations/ on the
-   claim branch and push. One specific question, addressed to one person,
-   with your recommended answer.
-4. If that person is present, ask the same question in the session.
-5. Set the contract status note to "parked" with the reason.
-
-To resume: follow Part 3, read the answer, then continue from the step the
-journal names.
-
-
-PART 7. TEMPLATES
------------------
-
---- delivery.config.yaml ---
-
-setup_complete: false
-engineer:
-  name:
-remit:
-  name:
-  lead:
-  page:                # path in Atlas
-  sessions_per_engineer: 1
-workspace:
-  root:
-  memory_gb:
-atlas:
-  path:
-  remote:
-  index:
-  folders:
-    north_star:
-    principles:
-    decisions:
-    remits:
-    agreed_flows:
-    legacy_flows:
-    flow_map:
-    target_state:
-    lessons:
-    mark_to_market:
-queue:
-  path:
-  remote:
-  default_branch:
-jira:
-  access:              # cli | tool | http | paste
-  read_command:        # use {key} as the placeholder
-repos:
-  - name:
-    path:
-    default_branch:
-    build:
-    lint:
-    unit_test:
-    contract_test:
-spotlights:
-  start_command:       # use {name}
-  stop_command:
-  health_command:
-  known:
-    - name:
-      flows: []
-      services: []
-fakers:
-  path:
-  how_to_stage:
-verification:
-  skills:
-    - flow:
-      command:
-tracks:
-  lease_method:        # branch | assigned | unknown
-  deploy_trigger:
-  results_path:        # repo, branch and path the pipeline writes to
-  reset:
-merge_requests:
-  create:              # push_option | manual
-  target_branch:
-tiers:
-  default: 1
-  auto_merge: []       # change types the remit lead allows, by tier
-budgets:
-  hours_per_item: 8
-  track_runs_per_item: 3
-verified:              # pass | fail | unknown, with date
-  atlas_read:
-  jira_read:
-  queue_fetch:
-  queue_push:
-  repo_tests:
-  spotlight:
-  faker_stage:
-  verify_flow:
-  track_deploy:
-  merge_request:
-level:                 # 0 to 3
-
---- Atlas remit page ---
-
-# Remit: <name>
-
-Lead: <name>, since <date>. Next rotation: <date>.
-Scope: flows, services and repos this remit owns.
-
-## What good looks like
-Criteria a reviewer applies, stated so an agent can be graded on them.
-Each one specific and checkable where possible.
-
-## Exemplars
-Links to two or three contracts and proof bundles that met the standard,
-and one that did not, with why.
-
-## Verification skills
-Flow, command, what it captures.
-
-## Known traps
-Things that have gone wrong here before.
-
-## Autonomy
-Sessions per engineer. What may merge without human review, by change
-type and tier.
-
-## Handover notes
-Open escalations and items in flight at the last rotation.
-
---- items/<KEY>/contract.yaml ---
-
-key:
-title:
-status: Claimed
-status_note:
-remit:
-owner_engineer:
-owner_product:
-approved_by:           # engineer for tiers 0-1, remit lead for tiers 2-3
-outcome_link:          # Atlas objective or North Star line
-problem: >
-  The problem restated in your own words.
-intent: >
-  Two or three sentences: the result for the user or the business.
-scope:
-  repos: []
-  services: []
-  out_of_scope: []
-constraints:           # Atlas pages that bind this work
-  -
-tier:
-spotlight:
-proof_scenarios:
-  - id: S1
-    given:
-    when:
-    then:
-    faker_responses: []
-prod_signal:
-  metric:
-  watch_window:
-regression_plan:
-  - scenario: S1
-    rung:
-budget:
-  hours:
-  track_runs:
-open_questions: []
-
---- items/<KEY>/proofs.json ---
-
-After approval, change only "passes". Never remove or reword an entry.
-
-[
-  {
-    "id": "P1",
-    "scenario": "S1",
-    "rung": "local",
-    "description": "",
-    "command": "",
-    "evidence": "bundle/rung1/P1.txt",
-    "passes": false
-  }
-]
-
---- items/<KEY>/journal.md ---
-
-# <KEY> journal
-
-## Problem, in my words
-
-## Plan
-Numbered steps. Mark each done as you go.
-
-## Log
-<date time> What I did. What I learned. What is next.
-
-## Decisions
-Decision, why, and whether the owner has seen it.
-
-## Dead ends
-What I tried that did not work, so nobody tries it again.
-
-## Corrections received
-Each correction, and the check proposed so it need not be repeated.
-
-## Resume from
-The exact step, the last green commit, and the next command.
-
---- items/<KEY>/bundle/SUMMARY.md ---
-
-# <KEY> proof bundle
-
-Verdict: state reached, in one line.
-Contract: items/<KEY>/contract.yaml
-Tier:
-
-## Change set
-Repo, branch, commit for every repo involved.
-
-## Environment
-Spotlight or track used, and versions.
-
-## Proofs
-For each scenario: proof, result, path to saved output.
-Include the failing-first output from before implementation.
-
-## Verification findings
-What the fresh-eyes check found and what was done about each.
-
-## Not tested
-Everything in scope that has no proof, and why.
-
-## Risks and decisions to check
-
---- escalations/<KEY>-<n>.md ---
-
-# <KEY> question <n>
-
-To: engineer | remit lead | product
-Asked by: <engineer> session, <date time>
-Blocking: yes | no
-
-Question: one specific question.
-
-Context: what I was doing and what I tried.
-
-Options: A, B, C with consequences.
-
-My recommendation:
-
-Answer: (owner writes here and commits)
-
-
-PART 8. QUEUE REPO LAYOUT
--------------------------
-
-Default branch:
-  ready/<KEY>.yaml          contracts approved and waiting to be claimed
-  README.md                 points to this manual
-
-Branch claim/<KEY>, created by the session that takes the item:
-  items/<KEY>/contract.yaml
-  items/<KEY>/proofs.json
-  items/<KEY>/journal.md
-  items/<KEY>/bundle/
-  items/<KEY>/track-handoff.md      level 1 only
-  escalations/<KEY>-<n>.md
-
-Branch lease/track-NN, when leases are branches:
-  lease.yaml                owner, item key, taken at, expires at
-
-Conventions:
-  - One file per item and per question. Never edit another item's files.
-  - The first push of claim/<KEY> or lease/track-NN wins. A rejected push
-    means it is taken.
-  - Code branches are named item/<KEY> in every repo.
-  - The claim branch merges to the default branch when the item reaches
-    Regressed.
+How to park: manual/COORDINATE.txt, "Parking".

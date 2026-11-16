@@ -1,0 +1,187 @@
+CONCEPTS: WHAT THE WORDS MEAN
+=============================
+Part of the delivery manual, v0.3.
+
+Read this once per workspace, and again whenever a term is unclear. The
+last section says which part of the spec, proof-driven-delivery-system.txt,
+explains the reasoning behind each idea. Read that section when you need
+the why, not only the what.
+
+
+People and ownership
+--------------------
+
+remit           An area of the product that one senior engineer answers
+                for: a set of outcomes, with the flows, services and repos
+                behind them. Remits follow outcomes, not repos, so one
+                ticket can touch repos from several remits.
+remit lead      The senior engineer who currently owns "what good looks
+                like" for a remit. The role rotates. Approves the proofs
+                for tiers 2 and 3.
+remit page      The remit's standard, written in Atlas: criteria for good,
+                exemplar contracts and bundles, verification skills, known
+                traps, how many sessions are allowed, what may auto-merge.
+outcome owner   The product person who owns a ticket's intent, answers
+                challenges and accepts the result at UAT.
+harness team    The engineers who own tracks, spotlights, fakers, the
+                queue repo and this manual.
+
+
+Knowledge
+---------
+
+Atlas           The team's knowledge repo, and the only source that binds
+                you. It holds the North Star, principles, decisions, remit
+                pages, agreed and legacy flows, the target state, lessons,
+                minutes, and the weekly mark to market.
+llm-wiki        The format Atlas is written in: a wiki kept for, and
+                largely by, language-model sessions. It has an index page
+                that you read first, pages that link to one another, an
+                append-only log of what changed and when, and a schema page
+                that says how the wiki is organised. If your organisation
+                also keeps a separate wiki under that name, the config
+                lists it under "knowledge". It is context only, and Atlas
+                wins where they disagree.
+North Star      The outcome everything is meant to move. Each ticket
+                should link to a line of it, or to an objective under it.
+mark to market  The weekly comparison of progress against that week's
+                objectives. It tells you what is a priority now.
+principle       A standing rule. Binding.
+decision        A recorded choice. Binding; the newest wins, and a
+                superseded one no longer counts.
+agreed flow     How a flow is meant to behave today. Binding.
+legacy flow     A flow being retired. Do not extend it.
+target state    Where the system is heading. Binding, after agreed flows.
+flow            One end-to-end behaviour of the product, such as "refund",
+                usually across several services.
+flow map        For each flow: how to reach it in a spotlight, how to
+                drive it, its flags and data, known traps. Reference, not
+                rule: check it against the product when it looks stale.
+catalogs        Reference pages: services (what each owns and how to run
+                it), fakers, spotlights, proofs (the regression suite by
+                flow and rung), and the glossary.
+project map     Which Jira project and component belongs to which remit,
+                flows and repos. It is how you find the right context for
+                a ticket.
+
+
+Environments
+------------
+
+cluster         The group of services, from about twenty repos, that
+                together make the product run.
+test track      A full cluster in the cloud, with fakers standing in for
+                systems the team does not own. There are few of them, so
+                they are leased and reset to a baseline before each use.
+spotlight       A named part of a cluster small enough to run inside a
+                workspace. One fits at a time.
+faker           A stand-in for a system the team does not own. It returns
+                staged responses. Also called a digital twin.
+faker drift     A faker that no longer behaves like the real system. The
+                usual reason a change passes on a track and fails in UAT.
+integrated UAT  The environment with real integrations in place of
+                fakers. Product accepts work there.
+lease           The right to use one test track for a limited time.
+baseline track  A track that runs the full regression on the default
+                branches continuously.
+merge train     Several locally proven changes put on one track and proven
+                together, to save track time.
+
+
+Proof
+-----
+
+rung            One level of proof. Five of them make the proof ladder:
+                  1 local     a spotlight in the workspace, with fakers
+                  2 track     the full cluster, with fakers
+                  3 UAT       real integrations; product accepts
+                  4 prod      live, behind a flag; a signal is watched
+                  5 regression  the proofs join the permanent suite
+success         One thing that must be true when the work is done: what is
+criterion       observed, the exact condition, and how it is observed.
+proof scenario  A given, when, then case that shows criteria are met.
+proof           An executable check for a scenario at a rung, with its
+                saved output as evidence.
+frozen proofs   The proof list once it is fixed, before implementation.
+                From then on only the "passes" values may change.
+holdout         A scenario product keeps where sessions cannot read it,
+scenario        and runs at UAT. It stops an agent from fitting its work
+                to the tests it can see. It is why you never claim "fully
+                verified".
+proof bundle    The evidence for an item: a summary, plus the saved
+                outputs, transcripts and screenshots.
+verification    A script with short instructions that drives one flow of
+skill           the real product and returns pass or fail with evidence.
+keep or revert  Each attempt ends at a commit no worse than the last, or
+                is reset.
+improvement     Work that is a number, not a feature, run as repeated
+loop            measured experiments.
+
+
+Work
+----
+
+item            One piece of work, named by its Jira key.
+work contract   The item's definition of done: intent, scope, success
+                criteria, proof scenarios, proofs by rung, tier, budget.
+tier            How much autonomy a change gets, 0 to 3, set by what it
+                touches. Higher tiers need more human approval.
+budget          The hours, iterations and track runs an item may use
+                before it must stop and ask.
+stop condition  A situation in which you park the item and ask.
+state           Where an item is: Draft, Ready, Claimed, Local-proven,
+                Track-proven, UAT-proven, Live, Confirmed, Regressed. Or
+                beside that line: Satisfied (already done), Cancelled,
+                Decomposed (an epic split into stories).
+hold            Why an item is waiting: parked, waiting-track,
+                waiting-results, waiting-approval, waiting-answer,
+                challenge.
+challenge       A written objection to a ticket, for product to answer.
+
+
+Coordination
+------------
+
+queue repo      The git repo through which sessions see each other.
+claim           The branch claim/KEY in the queue repo. Its existence
+                means someone holds the item.
+card            The small file on a claim that says who holds it, which
+                session is active, when it last saved, and what it
+                touches.
+session id      Engineer, machine and session: dana@ws-2#a41f.
+active session  The one session allowed to work on an item right now.
+heartbeat       The time of the active session's last save. Old means the
+                session is probably gone.
+board           One generated file listing every open item, question,
+                track and request, so nobody reads hundreds of branches.
+evidence        Where large evidence goes, so claims stay small.
+branch
+request         A note to the harness team that a capability is missing.
+shared          environment.yaml: the facts that are the same for every
+environment     workspace, published once.
+level           What a workspace can do: 0 nothing yet, 1 local proof
+                only, 2 plus tracks, 3 plus merge requests.
+session cap     How many sessions an engineer in a remit may run. It
+                starts at one and rises as the remit earns it.
+
+
+Where the spec explains it
+--------------------------
+
+  Why proof, not coding, is the limit; the eight principles    section 1
+  The loop from contract to regression, in one picture         section 2
+  The work contract, intake, ready, states                     section 3
+  Atlas: format, authority, freshness                          section 4
+  The proof ladder, proof before code, the bundle, keeping
+    proofs honest, faker drift, verification skills, flow map  section 5
+  The run loop, durable state, keep or revert, git as the
+    control plane, sessions per engineer, earning parallelism,
+    improvement loops                                          section 6
+  Tracks, leases, batching, spotlights, fakers                 section 7
+  Roles and remit leads                                        section 8
+  Cadence                                                      section 9
+  Tiers, hard rules, stop conditions, rules in the codebase,
+    earned auto-merge, unattended runs                         section 10
+  Metrics                                                      section 11
+  Rollout                                                      section 12
+  Open decisions                                               section 13

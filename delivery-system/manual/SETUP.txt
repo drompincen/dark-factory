@@ -1,0 +1,236 @@
+SETUP: FIRST RUN IN A WORKSPACE
+===============================
+Part of the delivery manual, v0.3. Read DELIVERY-AGENT.txt first.
+
+Goal: a complete delivery.config.yaml, proven by running things, with as
+few questions to the engineer as possible. Fifty engineers should not each
+answer the same interview, so read what is already known before you ask.
+
+
+Step 1. Read what is already known
+----------------------------------
+
+- environment.yaml, in the delivery system directory. It holds what is the
+  same for every workspace: where Atlas and the queue are, how Jira is
+  read, how spotlights start, how tracks deploy and return results, the
+  thresholds. Take every answer it gives.
+  If it is missing or mostly empty, tell the engineer. You will have to
+  ask more, and every answer that is not particular to this workspace
+  should be proposed for that file in step 9.
+- Configs that other engineers published:
+      dq configs                      lists them
+      dq configs ENGINEER/MACHINE     prints one
+  One from your own engineer on another machine carries over almost whole.
+- If "dq install" has not been run here, ask the engineer to run it, or
+  run it with their go-ahead:
+      dq install --workspace <workspace root>
+  It writes the short instruction block, the skills, the hooks and an
+  empty delivery.config.yaml.
+
+
+Step 2. Get the repos
+---------------------
+
+A closed workspace can only clone what it knows the address of. The
+addresses are in environment.yaml.
+
+- The queue repo, from queue.remote. Clone one branch only, so ordinary
+  fetches stay small:
+      git clone --single-branch <queue.remote> <workspace>/queue
+- Atlas, from atlas.remote. Any separate wiki that "knowledge" names.
+- The code repos of your remit, from code.remote_base. The project map and
+  the remit page say which.
+
+An address that is written nowhere is the first question for the
+engineer, and a line to propose for environment.yaml.
+
+
+Step 3. Discover locally
+------------------------
+
+Inspect the workspace and draft the config from what you find:
+
+- Which directories are git repos; each one's remotes and default branch.
+- In Atlas: the index page, the schema page, the log, and the folders for
+  the North Star, principles, decisions, remits, flows, target state,
+  lessons, mark to market, the catalogs and the project map.
+- Build and test entry points in each repo.
+- Scripts or compose files that start a cluster, a spotlight or fakers.
+- Anything that already drives a flow end to end.
+- Pipeline definitions that deploy to test tracks, and what triggers them.
+- Existing agent instruction files, skills, hooks and subagents.
+- How Jira can be read from here: a command, a tool, an HTTP endpoint.
+
+
+Step 4. Ask only what is still unknown
+--------------------------------------
+
+Show what you found so the engineer can correct it. At most four questions
+at a time. Offer your best guess as the default, so the reply can be "yes".
+
+A. Identity and remit
+   - Your name. Which remit do you work in, and who leads it now?
+   - Where is the remit page? If there is none, may I draft one from
+     templates/remit-page.md for the lead to correct?
+B. Knowledge
+   - Is the llm-wiki Atlas itself, or a separate wiki? If separate, where
+     is it, and is it context only?
+   - Which Atlas page is the index, which is the log, which describes how
+     Atlas is organised?
+   - Where is the project map from Jira projects and components to remits,
+     flows and repos?
+C. Backlog
+   - How do I read one Jira issue from here? The exact command or tool, or
+     will you paste issues in?
+   - How do I list the stories of an epic? How do I search Jira?
+D. Code
+   - Which repos are in scope, and where are they cloned?
+   - Confirm the build, lint, unit test and contract test commands I found.
+E. Local proof
+   - How do I start, stop and health-check a spotlight? Which exist?
+   - Can a spotlight run code from a worktree, or only from the main
+     checkouts?
+   - Where do fakers live, and how do I stage a response?
+   - Is there a verification skill for this remit's flows? Where?
+F. Tracks
+   - What exactly makes a track deploy my change set?
+   - How do I get a track: a lease branch, or does a person assign one?
+   - Where do results, logs and traces come back to: which repo, branch
+     and path?
+G. Merge requests
+   - Can I open one with git push options, or do you open them?
+H. Limits
+   - What may merge without human review in this remit, if anything?
+   - How many sessions is this remit allowed per engineer today?
+
+An answer the engineer does not know is recorded as unknown; setup goes
+on. A capability that does not exist at all goes to the harness team as a
+request (DELIVERY-AGENT.txt, section 5).
+
+
+Step 5. Write the config
+------------------------
+
+Fill in delivery.config.yaml from templates/delivery.config.yaml. Put in
+it only what is particular to this engineer and machine, or what must
+differ from the shared file. Then:
+
+    dq doctor
+
+
+Step 6. Smoke tests
+-------------------
+
+Actually do each one. Record pass, fail or unknown, with the date, under
+"verified" in the config.
+
+  atlas_read       Read the index, the newest log entries, one decision and
+                   the remit page. Check each page's status and date.
+  jira_read        Read one real issue.
+  jira_children    List the stories of one real epic.
+  queue_fetch      dq look
+  queue_claim      dq protect-check     CREATE=ok means you can claim.
+  queue_protected  The same command. RESULT=pass means the server refuses
+                   a force-push, so a claim cannot be overwritten.
+                   RESULT=warn means it does not: tell the engineer, and
+                   file a request for the repo admin to protect claim/*
+                   and lease/*.
+  repo_tests       Run the unit tests of one repo.
+  spotlight        dq spot take, start one spotlight, health-check it, stop
+                   it, dq spot release.
+  faker_stage      Stage one faker response and observe it.
+  verify_flow      Drive one real flow end to end and capture the evidence.
+  track_deploy     Only with the engineer's go-ahead: deploy an unchanged
+                   branch to a track and see the results come back.
+  merge_request    Only with go-ahead: open and close a draft.
+  unattended_permissions    Step 7.
+
+
+Step 7. Permissions for unattended runs
+---------------------------------------
+
+A run that is meant to last hours stops dead at the first permission
+prompt nobody is there to answer. Settle this before the first long run.
+
+What "dq install" already put in .claude/settings.json:
+
+- A rule allowing dq itself.
+- Rules denying a push that forces, deletes or mirrors.
+- A hook before each shell command that blocks a force-push, a remote
+  branch deletion and a push to a default branch, and that sends an edit
+  to a protected path to the engineer for approval.
+- A hook at the end of each turn that will not let a session stop with
+  unsaved item files, unpushed commits in the item's worktrees, or a proof
+  marked passing with no evidence.
+
+What you add now, with the engineer's approval: an allow rule for every
+command the loop runs, taken from the config, so that none of them prompts.
+
+  git, in the item's worktrees    status, diff, log, fetch, add, commit,
+                                  merge, switch, worktree, and
+                                  "git push origin item/*" only
+  each repo's                     build, lint, unit test and contract test
+                                  commands
+  the spotlight                   start, stop and health-check commands
+  fakers                          the staging command
+  the remit's verification        each skill's command
+    skills
+  Jira                            the read, children and search commands
+
+Write a rule as the command with a * where it varies, for example
+"Bash(git commit *)". A rule matches the command text as you type it, so
+type commands the way the rules expect: "git push origin item/KEY", not
+"git -C dir push ...". Never add an allow rule for a bare "git push *".
+
+Which mode to run in:
+
+  attended      The default mode, or acceptEdits, with the rules above.
+  unattended    Start the session with:  claude --permission-mode dontAsk
+                Anything not allowed by a rule is refused and the session
+                keeps going; it never waits for an answer. If your
+                organisation has enabled auto mode, that is the
+                alternative. The shared file names the team's choice
+                under permissions.unattended_mode.
+
+Rehearse it: repeat the smoke tests of step 6 in the unattended mode. Each
+command that is refused and that the loop needs becomes a rule, with the
+engineer's approval. When a whole rehearsal runs without a refusal, record
+unattended_permissions as pass.
+
+These names come from the Claude Code documentation at the time this
+manual was written. If your version differs, /permissions and /hooks show
+what it supports; the rules in DELIVERY-AGENT.txt hold either way.
+
+Rules and hooks are guard rails on this machine. The guarantee that a
+claim cannot be overwritten is the server's branch protection, which is
+what queue_protected tests.
+
+
+Step 8. State your level and the session cap
+--------------------------------------------
+
+  Level 0  Cannot read Atlas, or cannot run tests. Fix that first.
+  Level 1  Local only. You deliver to Local-proven and write a track
+           handoff for a person to run.
+  Level 2  Local plus tracks. You deliver to Track-proven.
+  Level 3  Level 2 plus merge requests. The full loop of the manual.
+
+If verify_flow did not pass, say so first and plainly: the most valuable
+next work is not a ticket. It is the verification skill for this remit's
+main flow (DELIVER.txt, "Verification skills"). Recommend one attended
+session per engineer until that exists and a few items have landed clean.
+More sessions before then produce more unproven work, not more delivery.
+The remit lead raises the cap.
+
+
+Step 9. Publish and finish
+--------------------------
+
+- Set setup_complete to true and write the level.
+- Publish the config, so your engineer's other machines and other
+  engineers can read it:
+      dq publish-config
+- Propose for environment.yaml every answer that is the same for
+  everyone: a request to the harness team listing each key and value.
+- Report in a short table: each capability and its result, your level,
+  the session cap, and the one or two fixes that would raise the level.
