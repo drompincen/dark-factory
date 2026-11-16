@@ -407,7 +407,7 @@ want_out "done-check finds a commit that names the key" 'PAY-77 fix the thing'
 want_out "done-check finds an Atlas page that names the key" 'decision.md'
 want_out "done-check counts its findings" '^FINDINGS=2$'
 run dq_m m1 done-check PAY-7;       want_out "a longer key does not match a shorter one" '^FINDINGS=0$'
-run dq_m m3 done-check PAY-1;       want_out "done-check sees an open claim" 'open claim: yes'
+run dq_m m4 done-check PAY-1;       want_out "done-check sees an open claim" 'open claim: yes'
 ( cd "$T/seed-queue" && git pull -q origin main && git fetch -q origin claim/PAY-9 && git merge -q --no-edit FETCH_HEAD && git push -q origin main )
 git -C "$T/server/queue.git" update-ref -d refs/heads/claim/PAY-9
 run dq_m m2 done-check PAY-9;       want_out "done-check sees an item closed on the default branch" 'closed item on main: yes'
@@ -585,6 +585,13 @@ mkdir -p "$T/m1/app/sub" "$D12/bundle/rung1"; echo marker > "$T/m1/app/sub/here.
 printf '[{"id":"P1","scenario":"S1","rung":"local","description":"","command":"test -f here.txt","cwd":"app/sub","timeout_s":30,"evidence":"bundle/rung1/P1.txt","passes":true}]\n' > "$D12/proofs.json"
 run dq_m m1 check-proofs PAY-12 --rung local
 want_out "a proof's cwd is taken from the workspace root" '^P1: PASS'
+run dq_m m1 done-check PAY-12;      want_out "done-check does not count your own claim" 'open claim: yours'
+want_out "so a fresh ticket of your own has no findings" '^FINDINGS=0$'
+run dq_m m3 done-check PAY-12;      want_out "another engineer still sees it as held" 'open claim: yes'
+run dq_m m1 beat PAY-12 -s "$S12" --hold parked --reason "waiting on a question"
+run dq_m m1 state PAY-12 -s "$S12" Cancelled --by product-kim
+want_out "a recorded state change clears the old hold" '^HOLD=none$'
+run dq_m m1 lease list;             want_no "a free track shows no holder" '[[:space:]]free[[:space:]]+none'
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 if [ "$FAIL" -gt 0 ]; then exit 1; fi

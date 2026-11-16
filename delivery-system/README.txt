@@ -29,6 +29,9 @@ WHAT IS HERE
                          python3 is used when present, for JSON.
   tools/selftest.sh      Runs dq against throwaway repos. Run it once in
                          your environment before relying on dq.
+  tools/walkthrough.sh   One delivery, command by command, from install to
+                         a closed item, in a throwaway world. Read its
+                         output to see what a session does.
   templates/             The files a session writes.
   environment.example.yaml
                          Copy to environment.yaml and fill in once.

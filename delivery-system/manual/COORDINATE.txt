@@ -119,6 +119,8 @@ Move state only through dq, which checks the evidence first:
 
     dq state KEY -s SESSION Local-proven
 
+A recorded state change clears whatever hold the item was under.
+
 Release when you stop working on the item, for any reason:
 
     dq release KEY -s SESSION --hold parked --reason "why"

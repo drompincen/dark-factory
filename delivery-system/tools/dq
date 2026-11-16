@@ -929,6 +929,7 @@ cmd_state() {
   [ -n "$st" ] || die "usage: dq state KEY -s SESSION STATE [--by NAME] [--no-run]   (states: $STATES)"
   case " $STATES " in *" $st "*) ;; *) die "unknown state: $st (one of: $STATES)" ;; esac
   gate "$KEY" "$st" "$SET_BY" || exit 6
+  if [ -z "$SET_HOLD" ]; then SET_HOLD="none"; fi   # progress ends whatever the item was waiting for
   if [ "$st" = Local-proven ] && [ "$NO_RUN" = 0 ]; then
     note "re-running the local proofs before recording $st ..."
     proofs_py "$dir/proofs.json" run local "$dir" || { note "a proof marked passing does not pass now. State not changed."; exit 6; }
@@ -1292,16 +1293,21 @@ cmd_inbox() {
 cmd_done_check() {
   local key="${1:-}"; if [ $# -ge 1 ]; then shift; fi
   valid_key "$key"; need_queue
-  local found=0 tip st name path br hits atlas repos=() line
+  local found=0 tip st name path br hits atlas repos=() line mine theirs
   echo "== queue =="
   tip="$(remote_tip "claim/$key")"
   if [ -n "$tip" ] && fetch_branch "claim/$key"; then
     st="$(Q show "$tip:items/$key/claim.yaml" 2>/dev/null | sed -n 's/^state:[ \t]*//p' | head -n1)"
+    mine="$(cat "$(item_dir "$key")/.dq/session" 2>/dev/null || true)"
+    theirs="$(Q show "$tip:items/$key/claim.yaml" 2>/dev/null | sed -n 's/^active_session:[ \t]*//p' | head -n1)"
     case " $CLOSED_STATES " in
-      *" $st "*) echo "open claim: no (closed, state $st). Read it: dq show $key bundle/SUMMARY.md" ;;
-      *) echo "open claim: yes (state $st). Someone already holds it: dq whois $key" ;;
+      *" $st "*) echo "open claim: no (closed, state $st). Read it: dq show $key bundle/SUMMARY.md"; found=$(( found + 1 )) ;;
+      *) if [ -n "$mine" ] && [ "$mine" = "$theirs" ]; then
+           echo "open claim: yours (state $st), held by this session"
+         else
+           echo "open claim: yes (state $st). Someone already holds it: dq whois $key"; found=$(( found + 1 ))
+         fi ;;
     esac
-    found=$(( found + 1 ))
   else
     echo "open claim: no"
   fi
@@ -1437,7 +1443,8 @@ lease_list() { # [brief]
       if [ -z "$L_HOLDER" ] || [ "$L_HOLDER" = none ]; then st=free
       elif [ "$(age_sec "$L_EXPIRES")" -gt 0 ]; then st=expired
       else st=held; fi
-      printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$t" "$st" "${L_HOLDER:--}" "${L_ENGINEER:--}" "${L_SESSION:--}" "${L_EXPIRES:--}"
+      if [ "$st" = free ]; then printf '%s\tfree\t-\t-\t-\t-\n' "$t"
+      else printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$t" "$st" "${L_HOLDER:--}" "${L_ENGINEER:--}" "${L_SESSION:--}" "${L_EXPIRES:--}"; fi
     done
     if [ "$any" = 0 ]; then printf '(none configured: set tracks.names)\t\t\t\t\t\n'; fi
   } | fmt_table
